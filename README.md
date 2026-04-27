@@ -1,6 +1,6 @@
 # HU-Speaker
 
-Template base para projeto Python com FastAPI, testes e ferramentas de qualidade.
+HU-Speaker (Motor de Chamada de Pacientes) e uma API de sintese de voz (TTS) desenvolvida para o Hospital Universitario da UFGD (Rede Ebserh/MS) com o objetivo de otimizar o fluxo de atendimento. O servico utiliza o Piper TTS para receber requisicoes do sistema de gestao hospitalar e gerar, em tempo real, os audios correspondentes a nomes, senhas e tokens. A aplicacao atua como o motor central responsavel pela convocacao audivel dos pacientes nas areas de triagem e consultorios.
 
 ## Estrutura
 
