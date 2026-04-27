@@ -27,7 +27,7 @@ def favicon() -> Response:
 
 def run() -> None:
     """Executa a API localmente sem reload."""
-    uvicorn.run("hu_speaker.main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("hu_speaker.main:app", host="0.0.0.0", port=8082, reload=False)
 
 
 if __name__ == "__main__":
