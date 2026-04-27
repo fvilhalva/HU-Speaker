@@ -1,8 +1,8 @@
 """Aplicacao FastAPI e ponto de entrada local."""
 
-from fastapi import FastAPI
-from fastapi import Response
-import uvicorn
+from fastapi import FastAPI # type: ignore[import]
+from fastapi import Response # type: ignore[import]
+import uvicorn # type: ignore[import]
 
 app = FastAPI(title="HU-Speaker API", version="0.1.0")
 
