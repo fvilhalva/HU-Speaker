@@ -21,6 +21,6 @@ RUN pip install --no-cache-dir --no-deps .
 RUN useradd -m appuser
 USER appuser
 
-EXPOSE 8000
+EXPOSE 8082
 
 CMD ["uvicorn", "hu_speaker.main:app", "--host", "0.0.0.0", "--port", "8082"]

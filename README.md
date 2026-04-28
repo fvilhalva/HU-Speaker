@@ -66,7 +66,14 @@ mypy src
 
 ```bash
 docker build -t hu-speaker .
-docker run --rm -p 8000:8000 hu-speaker
+docker run --rm -p 8082:8082 hu-speaker
+```
+
+### Subir com Docker Compose
+
+```bash
+docker compose up
+docker compose up --build
 ```
 
 ## Proximos passos sugeridos
