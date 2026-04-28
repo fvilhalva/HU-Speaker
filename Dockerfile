@@ -7,15 +7,10 @@ WORKDIR /app
 
 # Instala dependencias primeiro para aproveitar melhor o cache de camadas
 COPY pyproject.toml README.md /app/
-RUN pip install --no-cache-dir \
-    "fastapi>=0.115.0" \
-    "uvicorn[standard]>=0.30.0" \
-    "httpx>=0.27.0" \
-    "piper-tts"
 
-# Copia o codigo e instala apenas o pacote local
+# Copia o codigo e instala o pacote com as dependencias declaradas no projeto
 COPY src /app/src
-RUN pip install --no-cache-dir --no-deps .
+RUN pip install --no-cache-dir .
 
 # Executa sem privilegios de root
 RUN useradd -m appuser
