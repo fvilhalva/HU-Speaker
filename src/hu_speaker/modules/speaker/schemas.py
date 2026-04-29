@@ -1,6 +1,6 @@
 """Schemas (DTOs) para o módulo de Speaker."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field # type: ignore[import]
 
 
 class SynthesisRequest(BaseModel):

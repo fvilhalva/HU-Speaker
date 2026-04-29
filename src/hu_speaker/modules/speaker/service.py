@@ -53,6 +53,17 @@ class SpeakerService:
 
         voice = self._get_voice()
         with wave.open(str(audio_path), "wb") as wav_file:
+            # Ensure WAV header fields are set before writing frames.
+            # Some voice implementations set these themselves, but
+            # guard here to avoid wave.Error on close if they don't.
+            try:
+                wav_file.setframerate(22050)
+                wav_file.setsampwidth(2)
+                wav_file.setnchannels(1)
+            except Exception:
+                # Best-effort: continue and let synthesize handle errors
+                pass
+
             voice.synthesize(text, wav_file)
 
         result = {

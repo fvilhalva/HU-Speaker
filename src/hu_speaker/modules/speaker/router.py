@@ -1,6 +1,6 @@
 """Router de Speaker (Síntese de Voz)."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter # type: ignore[import]
 
 from hu_speaker.modules.speaker.controller import SpeakerController
 from hu_speaker.modules.speaker.schemas import SynthesisRequest, SynthesisResponse
