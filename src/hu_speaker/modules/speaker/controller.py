@@ -13,10 +13,20 @@ class SpeakerController:
 
     def synthesize(self, request: SynthesisRequest) -> SynthesisResponse:
         """Processa uma requisição de síntese de voz."""
-        result = self.service.synthesize(text=request.text, language=request.language)
+        result = self.service.synthesize(
+            text=request.text,
+            language=request.language,
+            length_scale=request.length_scale
+        )
 
         return SynthesisResponse(**result)
 
     def get_status(self, synthesis_id: str) -> dict[str, str]:
         """Obtém o status de uma síntese."""
         return self.service.get_synthesis_status(synthesis_id)
+
+    def get_audio(self, synthesis_id: str) -> bytes:
+        """Obtém o arquivo WAV sintetizado."""
+        audio_path = self.service.get_audio_file(synthesis_id)
+        with open(audio_path, "rb") as f:
+            return f.read()

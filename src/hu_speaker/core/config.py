@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     HIS_API_TIMEOUT: int = 30
 
     # Piper TTS
-    PIPER_MODEL: str = "pt_BR-karin-1.0"
+    PIPER_MODEL: str = "pt_BR-faber-medium.onnx"
     PIPER_SPEAKERS: str = "0"  # Índice do speaker
     AUDIO_OUTPUT_DIR: str = "/tmp/hu-speaker-audio"
     MAX_TEXT_LENGTH: int = 1000
