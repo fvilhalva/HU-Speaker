@@ -9,8 +9,10 @@ from typing import Any
 
 try:
     from piper import PiperVoice  # type: ignore[import]
+    from piper.config import SynthesisConfig  # type: ignore[import]
 except ImportError:  # pragma: no cover - depends on runtime environment
     PiperVoice = Any
+    SynthesisConfig = Any
 
 from hu_speaker.core.config import get_settings
 
@@ -42,8 +44,14 @@ class SpeakerService:
 
         return self._voice
 
-    def synthesize(self, text: str, language: str = "pt_BR") -> dict[str, str]:
-        """Sintetiza um texto em áudio."""
+    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
+        """Sintetiza um texto em áudio.
+        
+        Args:
+            text: Texto a sintetizar
+            language: Idioma (padrão: pt_BR)
+            length_scale: Velocidade do áudio (0.5-2.0, padrão 1.0)
+        """
         text = text.strip()
         if not text:
             raise ValueError("text must not be empty")
@@ -53,18 +61,9 @@ class SpeakerService:
 
         voice = self._get_voice()
         with wave.open(str(audio_path), "wb") as wav_file:
-            # Ensure WAV header fields are set before writing frames.
-            # Some voice implementations set these themselves, but
-            # guard here to avoid wave.Error on close if they don't.
-            try:
-                wav_file.setframerate(22050)
-                wav_file.setsampwidth(2)
-                wav_file.setnchannels(1)
-            except Exception:
-                # Best-effort: continue and let synthesize handle errors
-                pass
-
-            voice.synthesize(text, wav_file)
+            # Use synthesize_wav() which handles WAV format setup automatically
+            syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
+            voice.synthesize_wav(text, wav_file, syn_config=syn_config)
 
         result = {
             "id": synthesis_id,
@@ -83,3 +82,11 @@ class SpeakerService:
             return {"id": synthesis_id, "status": "completed"}
 
         return {"id": synthesis["id"], "status": synthesis["status"]}
+
+    def get_audio_file(self, synthesis_id: str) -> Path:
+        """Retorna o caminho do arquivo WAV sintetizado."""
+        audio_path = self.output_dir / f"{synthesis_id}.wav"
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        return audio_path

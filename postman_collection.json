@@ -1,0 +1,193 @@
+{
+  "info": {
+    "name": "HU-Speaker API",
+    "description": "Collection para testar a API de síntese de voz com Piper TTS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8082/health",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Verifica se a API está rodando"
+      }
+    },
+    {
+      "name": "Synthesize - Curto",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Olá mundo\",\n  \"language\": \"pt_BR\",\n  \"length_scale\": 1.0\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8082/speak/synthesize",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "synthesize"
+          ]
+        },
+        "description": "Sintetiza um texto curto em áudio (velocidade normal)"
+      }
+    },
+    {
+      "name": "Synthesize - Para Idosos",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Bem vindo! Este é um teste para idosos com velocidade reduzida\",\n  \"language\": \"pt_BR\",\n  \"length_scale\": 1.4\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8082/speak/synthesize",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "synthesize"
+          ]
+        },
+        "description": "Sintetiza com velocidade reduzida (40% mais devagar) - ideal para idosos"
+      }
+    },
+    {
+      "name": "Synthesize - Médio",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"A API de síntese de voz está totalmente funcional. Você pode sintetizar qualquer texto em português brasileiro.\",\n  \"language\": \"pt_BR\",\n  \"length_scale\": 1.0\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8082/speak/synthesize",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "synthesize"
+          ]
+        },
+        "description": "Sintetiza um texto médio em áudio (velocidade normal)"
+      }
+    },
+    {
+      "name": "Synthesize - Rápido",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"Bem-vindo ao HU-Speaker! Esta é uma API moderna de síntese de voz usando Piper TTS.\",\n  \"language\": \"pt_BR\",\n  \"length_scale\": 0.8\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8082/speak/synthesize",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "synthesize"
+          ]
+        },
+        "description": "Sintetiza com velocidade aumentada (20% mais rápido)"
+      }
+    },
+    {
+      "name": "Get Status - {{synthesis_id}}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8082/speak/status/{{synthesis_id}}",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "status",
+            "{{synthesis_id}}"
+          ]
+        },
+        "description": "Obtém o status de uma síntese. Substitua {{synthesis_id}} pelo ID retornado em /synthesize"
+      }
+    },
+    {
+      "name": "Download Audio - {{synthesis_id}}",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8082/speak/download/{{synthesis_id}}",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "download",
+            "{{synthesis_id}}"
+          ]
+        },
+        "description": "Baixa o arquivo WAV. Substitua {{synthesis_id}} pelo ID retornado em /synthesize"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "synthesis_id",
+      "value": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
+      "type": "string"
+    }
+  ]
+}
