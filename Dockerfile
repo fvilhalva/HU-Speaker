@@ -1,19 +1,23 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 
-# Instala dependencias primeiro para aproveitar melhor o cache de camadas
+# Copy only pyproject.toml first (changes less frequently)
 COPY pyproject.toml README.md /app/
 
-# Copia o codigo e instala o pacote com as dependencias declaradas no projeto
-COPY src /app/src
+# Install dependencies (will be cached if pyproject.toml doesn't change)
 RUN pip install --no-cache-dir .
 
-# Executa sem privilegios de root
-RUN useradd -m appuser
+# Copy source code (changes more frequently)
+COPY src /app/src
+
+# Create appuser
+RUN useradd -m appuser && chown -R appuser:appuser /app
+
 USER appuser
 
 EXPOSE 8082
