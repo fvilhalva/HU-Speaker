@@ -7,7 +7,10 @@ import uuid
 import wave
 from pathlib import Path
 from typing import Any
-
+# Coqui TTS
+# from TTS.api import TTS
+# pip install TTS
+# from TTS.api import TTS
 try:
     from piper import PiperVoice  # type: ignore[import]
     from piper.config import SynthesisConfig  # type: ignore[import]
