@@ -18,3 +18,11 @@ class SynthesisResponse(BaseModel):
     text: str = Field(..., description="Texto sintetizado")
     language: str = Field(..., description="Idioma utilizado")
     status: str = Field(..., description="Status da síntese")
+
+
+class DeletionResponse(BaseModel):
+    """Resposta para exclusão de áudio."""
+
+    id: str = Field(..., description="ID único do áudio")
+    status: str = Field(..., description="Status da exclusão")
+    message: str = Field(..., description="Mensagem descritiva")

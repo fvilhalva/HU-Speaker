@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     AUDIO_OUTPUT_DIR: str = "/tmp/hu-speaker-audio"
     MAX_TEXT_LENGTH: int = 1000
 
+    # Audio Cleanup (limpeza de arquivos antigos)
+    CLEANUP_TTL_MINUTES: int = 10  # Tempo em minutos para manter arquivos WAV
+    CLEANUP_INTERVAL_SECONDS: int = 60  # Verificar limpeza a cada minuto
+    ENABLE_CLEANUP: bool = True  # Habilitar task de limpeza automática
+
     # Email (notificações)
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

@@ -1,13 +1,16 @@
 """Router de Speaker (Síntese de Voz)."""
 
-from fastapi import APIRouter  # type: ignore[import]
+import logging
+
+from fastapi import APIRouter, HTTPException, status  # type: ignore[import]
 from fastapi.responses import FileResponse  # type: ignore[import]
 
 from hu_speaker.modules.speaker.controller import SpeakerController
-from hu_speaker.modules.speaker.schemas import SynthesisRequest, SynthesisResponse
+from hu_speaker.modules.speaker.schemas import DeletionResponse, SynthesisRequest, SynthesisResponse
 
 router = APIRouter(prefix="/speak", tags=["speaker"])
 speaker_controller = SpeakerController()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/synthesize", response_model=SynthesisResponse)
@@ -25,9 +28,29 @@ def get_synthesis_status(synthesis_id: str) -> dict[str, str]:
 @router.get("/download/{synthesis_id}")
 def download_audio(synthesis_id: str) -> FileResponse:
     """Baixa o arquivo WAV sintetizado."""
-    audio_path = speaker_controller.service.get_audio_file(synthesis_id)
+    try:
+        audio_path = speaker_controller.service.get_audio_file(synthesis_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    logger.info("Audio download requested", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
     return FileResponse(
         path=audio_path,
         media_type="audio/wav",
         filename=f"{synthesis_id}.wav",
+    )
+
+
+@router.delete("/{synthesis_id}", response_model=DeletionResponse)
+def delete_audio(synthesis_id: str) -> DeletionResponse:
+    """Exclui o arquivo WAV sintetizado e seus metadados."""
+    try:
+        speaker_controller.delete_audio(synthesis_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return DeletionResponse(
+        id=synthesis_id,
+        status="deleted",
+        message="Audio deleted successfully",
     )
