@@ -17,7 +17,8 @@ dependencies = [
   "httpx>=0.27.0",
   "piper-tts",
   "pydantic-settings>=2.0.0",
-  "python-dotenv>=1.0.0"
+  "python-dotenv>=1.0.0",
+  "PyJWT>=2.0.0"
 ]
 
 [project.optional-dependencies]

@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SERVICE_API_KEY: str = ""
 
     # Integrações
     HIS_API_URL: str = ""  # URL do Sistema de Informação Hospitalar
@@ -36,6 +37,11 @@ class Settings(BaseSettings):
     PIPER_SPEAKERS: str = "0"  # Índice do speaker
     AUDIO_OUTPUT_DIR: str = "/tmp/hu-speaker-audio"
     MAX_TEXT_LENGTH: int = 1000
+
+    # Audio Cleanup (limpeza de arquivos antigos)
+    CLEANUP_TTL_MINUTES: int = 10  # Tempo em minutos para manter arquivos WAV
+    CLEANUP_INTERVAL_SECONDS: int = 60  # Verificar limpeza a cada minuto
+    ENABLE_CLEANUP: bool = True  # Habilitar task de limpeza automática
 
     # Email (notificações)
     SMTP_HOST: str = ""

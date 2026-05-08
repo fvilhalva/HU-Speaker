@@ -42,10 +42,13 @@ HU-Speaker é uma API de síntese de voz (TTS) desenvolvida para o Hospital Univ
 ### 1. Com Docker (Recomendado)
 
 ```bash
+cp .env.example .env
 docker compose up
 ```
 
 A API estará em `http://localhost:8082`
+
+Antes de subir, gere ou cole um token JWT no arquivo `.env` usando o `JWT_SECRET_KEY`.
 
 ### 2. Local (Python 3.11+)
 
@@ -71,6 +74,7 @@ uvicorn hu_speaker.main:app --reload
 
 ```bash
 curl -X POST http://localhost:8082/speak/synthesize \
+  -H "Authorization: Bearer <seu-jwt-aqui>" \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Bem-vindo ao HU-Speaker",
@@ -92,13 +96,17 @@ curl -X POST http://localhost:8082/speak/synthesize \
 #### 2. Baixar Áudio
 
 ```bash
-curl -o audio.wav http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
+curl -o audio.wav \
+  -H "Authorization: Bearer <seu-jwt-aqui>" \
+  http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
 ```
 
 #### 3. Verificar Status
 
 ```bash
-curl http://localhost:8082/speak/status/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
+curl \
+  -H "Authorization: Bearer <seu-jwt-aqui>" \
+  http://localhost:8082/speak/status/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
 ```
 
 ### Postman
@@ -124,6 +132,31 @@ Veja [Configurar Variáveis](#variáveis-no-postman) para automatizar o fluxo.
    ```
 
 3. Nas URLs, use: `{{base_url}}/speak/synthesize`
+
+4. Preencha as variáveis do environment:
+  - `jwt_token`: JWT assinado com o `JWT_SECRET_KEY`
+  - Claims sugeridas: `sub`, `source_system`, `actor_id`, `actor_name`, `actor_role`, `request_id`, `exp`
+
+Exemplo para gerar um token manualmente:
+
+```bash
+/usr/bin/python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+import jwt
+
+payload = {
+   "sub": "novosga-service",
+   "source_system": "novosga",
+   "actor_id": "123",
+   "actor_name": "Maria Silva",
+   "actor_role": "attendant",
+   "request_id": "req-001",
+   "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+}
+
+print(jwt.encode(payload, "your-super-secret-jwt-key-change-in-production", algorithm="HS256"))
+PY
+```
 
 ---
 
@@ -209,6 +242,29 @@ curl -o audio.wav http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6
 
 **Formato:** WAVE PCM 16-bit mono 22050 Hz
 
+**Cabeçalhos obrigatórios:**
+```bash
+X-API-Key: change-me-in-production
+X-Source-System: novosga
+X-Actor-Id: 123
+X-Actor-Name: Maria Silva
+X-Actor-Role: attendant
+X-Request-Id: req-001
+```
+
+### `DELETE /speak/{id}`
+
+Exclui imediatamente o arquivo WAV sintetizado e remove os metadados em memória.
+
+**Resposta:**
+```json
+{
+  "id": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
+  "status": "deleted",
+  "message": "Audio deleted successfully"
+}
+```
+
 ---
 
 ### `GET /speak/status/{id}`
@@ -222,6 +278,19 @@ Retorna o status de uma síntese.
   "status": "completed"
 }
 ```
+
+---
+
+## Variáveis de Ambiente
+
+As principais variáveis do fluxo de áudio são:
+
+- `AUDIO_OUTPUT_DIR=/tmp/hu-speaker-audio`
+- `ENABLE_CLEANUP=true`
+- `CLEANUP_TTL_MINUTES=10`
+- `CLEANUP_INTERVAL_SECONDS=60`
+
+Com isso, os arquivos WAV ficam em um diretório temporário e a limpeza roda com retenção máxima aproximada de 10 a 11 minutos, dependendo do intervalo de execução.
 
 ---
 
