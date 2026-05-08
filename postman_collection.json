@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "HU-Speaker API",
-    "description": "Collection para testar a API de síntese de voz com Piper TTS",
+    "description": "Collection para testar a API de síntese de voz com Piper TTS e JWT",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -29,6 +29,10 @@
       "request": {
         "method": "POST",
         "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -59,6 +63,10 @@
         "method": "POST",
         "header": [
           {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
             "key": "Content-Type",
             "value": "application/json"
           }
@@ -87,6 +95,10 @@
       "request": {
         "method": "POST",
         "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
           {
             "key": "Content-Type",
             "value": "application/json"
@@ -117,6 +129,10 @@
         "method": "POST",
         "header": [
           {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          },
+          {
             "key": "Content-Type",
             "value": "application/json"
           }
@@ -144,7 +160,12 @@
       "name": "Get Status - {{synthesis_id}}",
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
         "url": {
           "raw": "http://localhost:8082/speak/status/{{synthesis_id}}",
           "protocol": "http",
@@ -165,7 +186,12 @@
       "name": "Download Audio - {{synthesis_id}}",
       "request": {
         "method": "GET",
-        "header": [],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
         "url": {
           "raw": "http://localhost:8082/speak/download/{{synthesis_id}}",
           "protocol": "http",
@@ -181,9 +207,39 @@
         },
         "description": "Baixa o arquivo WAV. Substitua {{synthesis_id}} pelo ID retornado em /synthesize"
       }
+    },
+    {
+      "name": "Delete Audio - {{synthesis_id}}",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8082/speak/{{synthesis_id}}",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8082",
+          "path": [
+            "speak",
+            "{{synthesis_id}}"
+          ]
+        },
+        "description": "Exclui o arquivo WAV e seus metadados. Substitua {{synthesis_id}} pelo ID retornado em /synthesize"
+      }
     }
   ],
   "variable": [
+    {
+      "key": "jwt_token",
+      "value": "cole-aqui-um-jwt-gerado",
+      "type": "string"
+    },
     {
       "key": "synthesis_id",
       "value": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",

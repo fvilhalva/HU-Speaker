@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SERVICE_API_KEY: str = ""
 
     # Integrações
     HIS_API_URL: str = ""  # URL do Sistema de Informação Hospitalar
