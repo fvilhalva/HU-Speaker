@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     MAX_TEXT_LENGTH: int = 1000
 
     # Audio Cleanup (limpeza de arquivos antigos)
-    CLEANUP_TTL_MINUTES: int = 5  # Tempo em minutos para manter arquivos WAV
-    CLEANUP_INTERVAL_SECONDS: int = 300  # Verificar limpeza a cada 5 minutos
+    CLEANUP_TTL_MINUTES: int = 10  # Tempo em minutos para manter arquivos WAV
+    CLEANUP_INTERVAL_SECONDS: int = 60  # Verificar limpeza a cada minuto
     ENABLE_CLEANUP: bool = True  # Habilitar task de limpeza automática
 
     # Email (notificações)

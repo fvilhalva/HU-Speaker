@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 import wave
@@ -19,6 +20,9 @@ except ImportError:  # pragma: no cover - depends on runtime environment
     SynthesisConfig = Any
 
 from hu_speaker.core.config import get_settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class SpeakerService:
@@ -119,6 +123,7 @@ class SpeakerService:
         }
 
         self._syntheses[synthesis_id] = {**result, "audio_path": str(audio_path)}
+        logger.info("Audio synthesized", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
         return result
 
     def get_synthesis_status(self, synthesis_id: str) -> dict[str, str]:
@@ -136,4 +141,16 @@ class SpeakerService:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         return audio_path
+
+    def delete_audio_file(self, synthesis_id: str) -> None:
+        """Remove o arquivo WAV e os metadados associados."""
+        audio_path = self.output_dir / f"{synthesis_id}.wav"
+        if not audio_path.exists() and synthesis_id not in self._syntheses:
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        if audio_path.exists():
+            audio_path.unlink()
+
+        self._syntheses.pop(synthesis_id, None)
+        logger.info("Audio deleted", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
 

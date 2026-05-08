@@ -9,7 +9,7 @@ from hu_speaker.modules.speaker.service import SpeakerService
 
 
 class FakeVoice:
-    def synthesize(self, text: str, wav_file: wave.Wave_write) -> None:
+    def synthesize_wav(self, text: str, wav_file: wave.Wave_write, syn_config=None) -> None:
         wav_file.setframerate(22050)
         wav_file.setsampwidth(2)
         wav_file.setnchannels(1)
@@ -37,3 +37,16 @@ def test_speaker_service_get_status(tmp_path: Path) -> None:
 
     assert status["id"] == result["id"]
     assert status["status"] == "completed"
+
+
+def test_speaker_service_delete_audio(tmp_path: Path) -> None:
+    """Testa a exclusão de um áudio sintetizado."""
+    service = SpeakerService(voice=FakeVoice(), output_dir=tmp_path)
+    result = service.synthesize(text="Texto de teste", language="pt_BR")
+
+    audio_path = tmp_path / f"{result['id']}.wav"
+    assert audio_path.exists()
+
+    service.delete_audio_file(result["id"])
+
+    assert not audio_path.exists()

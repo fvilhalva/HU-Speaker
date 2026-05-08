@@ -209,6 +209,19 @@ curl -o audio.wav http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6
 
 **Formato:** WAVE PCM 16-bit mono 22050 Hz
 
+### `DELETE /speak/{id}`
+
+Exclui imediatamente o arquivo WAV sintetizado e remove os metadados em memória.
+
+**Resposta:**
+```json
+{
+  "id": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
+  "status": "deleted",
+  "message": "Audio deleted successfully"
+}
+```
+
 ---
 
 ### `GET /speak/status/{id}`
@@ -222,6 +235,19 @@ Retorna o status de uma síntese.
   "status": "completed"
 }
 ```
+
+---
+
+## Variáveis de Ambiente
+
+As principais variáveis do fluxo de áudio são:
+
+- `AUDIO_OUTPUT_DIR=/tmp/hu-speaker-audio`
+- `ENABLE_CLEANUP=true`
+- `CLEANUP_TTL_MINUTES=10`
+- `CLEANUP_INTERVAL_SECONDS=60`
+
+Com isso, os arquivos WAV ficam em um diretório temporário e a limpeza roda com retenção máxima aproximada de 10 a 11 minutos, dependendo do intervalo de execução.
 
 ---
 

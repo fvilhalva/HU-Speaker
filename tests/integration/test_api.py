@@ -1,8 +1,32 @@
 """Testes de integração da API."""
 
-from fastapi.testclient import TestClient # type: ignore[import]
- 
-from hu_speaker.main import app # type: ignore[import]
+from __future__ import annotations
+
+import wave
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient  # type: ignore[import]
+
+from hu_speaker.main import app  # type: ignore[import]
+from hu_speaker.modules.speaker import router as speaker_router
+from hu_speaker.modules.speaker.controller import SpeakerController
+from hu_speaker.modules.speaker.service import SpeakerService
+
+
+class FakeVoice:
+    def synthesize_wav(self, text: str, wav_file: wave.Wave_write, syn_config=None) -> None:
+        wav_file.setframerate(22050)
+        wav_file.setsampwidth(2)
+        wav_file.setnchannels(1)
+        wav_file.writeframes(b"\x00\x00" * 22050)
+
+
+@pytest.fixture()
+def speaker_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    service = SpeakerService(voice=FakeVoice(), output_dir=tmp_path)
+    monkeypatch.setattr(speaker_router, "speaker_controller", SpeakerController(service))
+    return TestClient(app)
 
 
 def test_root_endpoint() -> None:
@@ -40,10 +64,9 @@ def test_favicon_endpoint() -> None:
     assert response.status_code == 204
 
 
-def test_speaker_synthesize_endpoint() -> None:
+def test_speaker_synthesize_endpoint(speaker_client: TestClient) -> None:
     """Testa o endpoint de síntese."""
-    client = TestClient(app)
-    response = client.post(
+    response = speaker_client.post(
         "/speak/synthesize",
         json={"text": "Olá", "language": "pt_BR"},
     )
@@ -52,15 +75,29 @@ def test_speaker_synthesize_endpoint() -> None:
     data = response.json()
     assert data["text"] == "Olá"
     assert data["language"] == "pt_BR"
-    assert data["status"] == "processing"
+    assert data["status"] == "completed"
     assert "id" in data
 
 
-def test_speaker_status_endpoint() -> None:
+def test_speaker_status_endpoint(speaker_client: TestClient) -> None:
     """Testa o endpoint de status de síntese."""
-    client = TestClient(app)
-    response = client.get("/speak/status/test-123")
+    response = speaker_client.get("/speak/status/test-123")
 
     assert response.status_code == 200
     assert response.json()["id"] == "test-123"
     assert response.json()["status"] == "completed"
+
+
+def test_speaker_delete_endpoint(speaker_client: TestClient) -> None:
+    """Testa o endpoint de exclusão de áudio."""
+    synthesis_response = speaker_client.post(
+        "/speak/synthesize",
+        json={"text": "Excluir depois", "language": "pt_BR"},
+    )
+
+    synthesis_id = synthesis_response.json()["id"]
+    response = speaker_client.delete(f"/speak/{synthesis_id}")
+
+    assert response.status_code == 200
+    assert response.json()["id"] == synthesis_id
+    assert response.json()["status"] == "deleted"

@@ -12,6 +12,6 @@ services:
           size: 500m  # Limite de 500MB em RAM para arquivos de áudio
     environment:
       - AUDIO_OUTPUT_DIR=/tmp/hu-speaker-audio
-      - CLEANUP_TTL_MINUTES=5
-      - CLEANUP_INTERVAL_SECONDS=300
+      - CLEANUP_TTL_MINUTES=10
+      - CLEANUP_INTERVAL_SECONDS=60
       - ENABLE_CLEANUP=true
