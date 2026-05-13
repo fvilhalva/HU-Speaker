@@ -17,3 +17,9 @@ services:
       - CLEANUP_TTL_MINUTES=10
       - CLEANUP_INTERVAL_SECONDS=60
       - ENABLE_CLEANUP=true
+    networks:
+      - sga-net
+
+networks:
+  sga-net:
+    external: true
