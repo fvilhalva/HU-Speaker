@@ -67,28 +67,44 @@ class SpeakerService:
         return self._voice
 
     @staticmethod
+    def _spell_digits(digits: str) -> str:
+        """Soletra uma sequência de dígitos: '007' -> 'zero zero sete'."""
+        return " ".join(SpeakerService.DIGIT_MAP[c] for c in digits)
+
+    @staticmethod
     def _preprocess_text(text: str) -> str:
-        """Pré-processa o texto para melhor pronúncia.
-        
-        Converte sequências de caracteres isolados em palavras soltas.
-        Exemplo: "A1234" → "A um dois três quatro"
-        
+        """Pré-processa o texto para melhor pronúncia pelo Piper.
+
+        O Piper tropeça em "tokens" que misturam letra e número colados
+        (ex.: uma senha "A001"), chegando a engolir a letra. Aqui esses
+        casos são separados e os dígitos são soletrados um a um.
+
+        Exemplos:
+            "Senha A001"            -> "Senha A zero zero um"
+            "Senha C007, sala 12"   -> "Senha C zero zero sete, sala um dois"
+            "guichê 03"             -> "guichê zero três"
+
         Args:
             text: Texto original
-        
+
         Returns:
-            Texto pré-processado
+            Texto pré-processado, pronto para a síntese
         """
-        # Substituir dígitos por palavras
-        result = text
-        for digit, word in SpeakerService.DIGIT_MAP.items():
-            # Substituir dígito isolado (cercado por não-alfanuméricos ou fim de string)
-            # Mas manter números que são parte de palavras
-            result = re.sub(r"(?<![a-zA-Z0-9])" + digit + r"(?![a-zA-Z0-9])", f" {word} ", result)
-        
-        # Limpar múltiplos espaços
+        # 1) Token de senha: uma ou mais letras seguidas de dígitos (ex.: "A001").
+        #    Mantém a(s) letra(s) e soletra os dígitos separadamente.
+        def _repl_senha(m: re.Match) -> str:
+            letras, numeros = m.group(1), m.group(2)
+            return f"{letras} {SpeakerService._spell_digits(numeros)}"
+
+        result = re.sub(r"\b([A-Za-z]+)(\d+)\b", _repl_senha, text)
+
+        # 2) Números soltos restantes (ex.: o "03" de "guichê 03") também são
+        #    soletrados dígito a dígito, para pronúncia clara em painel.
+        result = re.sub(r"\d+", lambda m: SpeakerService._spell_digits(m.group(0)), result)
+
+        # 3) Normaliza espaços em excesso.
         result = re.sub(r"\s+", " ", result).strip()
-        
+
         return result
 
     def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
@@ -153,4 +169,3 @@ class SpeakerService:
 
         self._syntheses.pop(synthesis_id, None)
         logger.info("Audio deleted", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
-
