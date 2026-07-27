@@ -107,7 +107,7 @@ class SpeakerService:
 
         return result
 
-    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
+    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 2.0) -> dict[str, str]:
         """Sintetiza um texto em áudio.
         
         Args:

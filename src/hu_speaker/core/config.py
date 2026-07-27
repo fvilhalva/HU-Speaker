@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     SMTP_TLS: bool = True
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8080"  # Separado por vírgula
+    CORS_ORIGINS: str = "http://localhost:9000,http://127.0.0.1:9000"  # Separado por vírgula
 
     # Logging
     LOG_LEVEL: str = "INFO"
