@@ -12,8 +12,15 @@ services:
         target: /tmp/hu-speaker-audio
         tmpfs:
           size: 500m  # Limite de 500MB em RAM para arquivos de áudio
+          mode: 01777
     environment:
       - AUDIO_OUTPUT_DIR=/tmp/hu-speaker-audio
       - CLEANUP_TTL_MINUTES=10
       - CLEANUP_INTERVAL_SECONDS=60
       - ENABLE_CLEANUP=true
+    networks:
+      - sga-net
+
+networks:
+  sga-net:
+    external: true

@@ -67,28 +67,44 @@ class SpeakerService:
         return self._voice
 
     @staticmethod
+    def _spell_digits(digits: str) -> str:
+        """Soletra uma sequência de dígitos: '007' -> 'zero zero sete'."""
+        return " ".join(SpeakerService.DIGIT_MAP[c] for c in digits)
+
+    @staticmethod
     def _preprocess_text(text: str) -> str:
-        """Pré-processa o texto para melhor pronúncia.
-        
-        Converte sequências de caracteres isolados em palavras soltas.
-        Exemplo: "A1234" → "A um dois três quatro"
-        
+        """Pré-processa o texto para melhor pronúncia pelo Piper.
+
+        O Piper tropeça em "tokens" que misturam letra e número colados
+        (ex.: uma senha "A001"), chegando a engolir a letra. Aqui esses
+        casos são separados e os dígitos são soletrados um a um.
+
+        Exemplos:
+            "Senha A001"            -> "Senha A zero zero um"
+            "Senha C007, sala 12"   -> "Senha C zero zero sete, sala um dois"
+            "guichê 03"             -> "guichê zero três"
+
         Args:
             text: Texto original
-        
+
         Returns:
-            Texto pré-processado
+            Texto pré-processado, pronto para a síntese
         """
-        # Substituir dígitos por palavras
-        result = text
-        for digit, word in SpeakerService.DIGIT_MAP.items():
-            # Substituir dígito isolado (cercado por não-alfanuméricos ou fim de string)
-            # Mas manter números que são parte de palavras
-            result = re.sub(r"(?<![a-zA-Z0-9])" + digit + r"(?![a-zA-Z0-9])", f" {word} ", result)
-        
-        # Limpar múltiplos espaços
+        # 1) Token de senha: uma ou mais letras seguidas de dígitos (ex.: "A001").
+        #    Mantém a(s) letra(s) e soletra os dígitos separadamente.
+        def _repl_senha(m: re.Match) -> str:
+            letras, numeros = m.group(1), m.group(2)
+            return f"{letras} {SpeakerService._spell_digits(numeros)}"
+
+        result = re.sub(r"\b([A-Za-z]+)(\d+)\b", _repl_senha, text)
+
+        # 2) Números soltos restantes (ex.: o "03" de "guichê 03") também são
+        #    soletrados dígito a dígito, para pronúncia clara em painel.
+        result = re.sub(r"\d+", lambda m: SpeakerService._spell_digits(m.group(0)), result)
+
+        # 3) Normaliza espaços em excesso.
         result = re.sub(r"\s+", " ", result).strip()
-        
+
         return result
 
     def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
@@ -110,10 +126,34 @@ class SpeakerService:
         audio_path = self.output_dir / f"{synthesis_id}.wav"
 
         voice = self._get_voice()
+        syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
+
+        # Sample rate do modelo (pt_BR faber = 22050 Hz).
+        try:
+            sample_rate = int(voice.config.sample_rate)
+        except AttributeError:
+            sample_rate = 22050
+
+        # piper-tts 1.6.0: voice.synthesize() devolve uma sequencia de AudioChunk.
+        # Concatena os bytes int16 de TODOS os chunks e grava um unico WAV com o
+        # cabecalho correto. (Escrever apenas o primeiro chunk cortava a fala e
+        # deixava o audio truncado/estranho.)
+        audio_bytes = bytearray()
+        for chunk in voice.synthesize(processed_text, syn_config=syn_config):
+            data = getattr(chunk, "audio_int16_bytes", None)
+            if data is None:
+                # fallbacks para variacoes de atributo entre versoes
+                data = getattr(chunk, "audio_int16", None)
+                if data is not None and not isinstance(data, (bytes, bytearray)):
+                    data = data.tobytes()
+            if data:
+                audio_bytes.extend(data)
+
         with wave.open(str(audio_path), "wb") as wav_file:
-            # Use synthesize_wav() which handles WAV format setup automatically
-            syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
-            voice.synthesize_wav(processed_text, wav_file, syn_config=syn_config)
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)  # 16-bit PCM
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(bytes(audio_bytes))
 
         result = {
             "id": synthesis_id,
@@ -153,4 +193,3 @@ class SpeakerService:
 
         self._syntheses.pop(synthesis_id, None)
         logger.info("Audio deleted", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
-

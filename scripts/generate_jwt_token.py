@@ -18,7 +18,7 @@ def generate_token(
     actor_name: str = "Maria Silva",
     actor_role: str = "attendant",
     request_id: str = "req-001",
-    expires_in_minutes: int = 30,
+    expires_in_minutes: int = 720,
 ) -> str:
     """Gera um JWT válido para testes."""
     settings = get_settings()
@@ -46,7 +46,7 @@ def main():
     print("✓ Token JWT gerado com sucesso!")
     print("=" * 80)
     print()
-    print("Token (válido por 30 minutos):")
+    print("Token (válido por 12 horas):")
     print(token)
     print()
     print("INSTRUÇÕES POSTMAN:")

@@ -5,6 +5,7 @@ import time
 from threading import Thread
 
 from fastapi import FastAPI  # type: ignore[import]
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import]
 
 from hu_speaker.core.config import get_settings
 from hu_speaker.modules.common.router import router as common_router
@@ -64,6 +65,18 @@ def create_app() -> FastAPI:
         version=settings.APP_VERSION,
         description="API de síntese de voz para o Hospital Universitário da UFGD",
         debug=settings.DEBUG,
+    )
+
+    # CORS: permite que o painel (outra origem, ex.: http://localhost:9000)
+    # chame a API pelo navegador. As origens vêm de settings.CORS_ORIGINS
+    # (lista separada por vírgula).
+    cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # Registrar routers dos módulos

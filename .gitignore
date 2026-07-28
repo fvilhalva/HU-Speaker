@@ -37,6 +37,9 @@ logs/
 hm-speaker-audio/
 /tmp/
 
+# TTS model
+src/hu_speaker/models/pt_BR-faber-medium.onnx
+
 # OS
 .DS_Store
 Thumbs.db
