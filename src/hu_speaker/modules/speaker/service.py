@@ -107,7 +107,7 @@ class SpeakerService:
 
         return result
 
-    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 2.0) -> dict[str, str]:
+    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
         """Sintetiza um texto em áudio.
         
         Args:
@@ -126,10 +126,34 @@ class SpeakerService:
         audio_path = self.output_dir / f"{synthesis_id}.wav"
 
         voice = self._get_voice()
+        syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
+
+        # Sample rate do modelo (pt_BR faber = 22050 Hz).
+        try:
+            sample_rate = int(voice.config.sample_rate)
+        except AttributeError:
+            sample_rate = 22050
+
+        # piper-tts 1.6.0: voice.synthesize() devolve uma sequencia de AudioChunk.
+        # Concatena os bytes int16 de TODOS os chunks e grava um unico WAV com o
+        # cabecalho correto. (Escrever apenas o primeiro chunk cortava a fala e
+        # deixava o audio truncado/estranho.)
+        audio_bytes = bytearray()
+        for chunk in voice.synthesize(processed_text, syn_config=syn_config):
+            data = getattr(chunk, "audio_int16_bytes", None)
+            if data is None:
+                # fallbacks para variacoes de atributo entre versoes
+                data = getattr(chunk, "audio_int16", None)
+                if data is not None and not isinstance(data, (bytes, bytearray)):
+                    data = data.tobytes()
+            if data:
+                audio_bytes.extend(data)
+
         with wave.open(str(audio_path), "wb") as wav_file:
-            # Use synthesize_wav() which handles WAV format setup automatically
-            syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
-            voice.synthesize_wav(processed_text, wav_file, syn_config=syn_config)
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)  # 16-bit PCM
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(bytes(audio_bytes))
 
         result = {
             "id": synthesis_id,

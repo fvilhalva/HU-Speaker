@@ -140,13 +140,21 @@ Veja [Configurar Variáveis](#variáveis-no-postman) para automatizar o fluxo.
 Exemplo para gerar um token manualmente:
 
 ```bash
-python3 - <<'PY'
-import hmac, hashlib, base64, json, time
-secret = "78da1a17716592683e5e21d3c09ef47f77e005de8571e241a129804693aa54b5"
-def b64(d): return base64.urlsafe_b64encode(d).rstrip(b"=").decode()
-h=b64(json.dumps({"alg":"HS256","typ":"JWT"}).encode()); now=int(time.time())
-p=b64(json.dumps({"sub":"novosga-service","iat":now,"exp":now+43200}).encode())
-s=b64(hmac.new(secret.encode(), f"{h}.{p}".encode(), hashlib.sha256).digest()); print(f"{h}.{p}.{s}")
+/usr/bin/python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+import jwt
+
+payload = {
+   "sub": "novosga-service",
+   "source_system": "novosga",
+   "actor_id": "123",
+   "actor_name": "Maria Silva",
+   "actor_role": "attendant",
+   "request_id": "req-001",
+   "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+}
+
+print(jwt.encode(payload, "your-super-secret-jwt-key-change-in-production", algorithm="HS256"))
 PY
 ```
 
