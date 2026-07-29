@@ -1,723 +1,295 @@
 # HU-Speaker
 
-HU-Speaker é uma API de síntese de voz (TTS) desenvolvida para o Hospital Universitário da UFGD (Rede Ebserh/MS). Ela utiliza o Piper TTS para receber requisições do sistema de gestão hospitalar e gerar, em tempo real, áudios para nomes, senhas e tokens, apoiando a convocação audível de pacientes nas áreas de triagem e consultórios.
+**HU-Speaker** é uma API de síntese de voz (Text-to-Speech) desenvolvida para o Hospital
+Universitário da Grande Dourados (HU-UFGD / Rede Ebserh). Ela usa o motor **Piper TTS** para
+transformar texto em áudio de voz natural em português brasileiro.
 
-## 🚀 Status
+Seu propósito dentro do hospital é **substituir a chamada verbal de pacientes** ("no grito") por uma
+chamada automatizada no painel eletrônico. O caso de uso central é **falar o nome do paciente** —
+algo que os painéis de senha comuns não conseguem fazer, pois eles só reproduzem fragmentos de áudio
+pré-gravados (letras, números, palavras fixas). O nome de uma pessoa é texto arbitrário e só pode ser
+vocalizado por síntese em tempo real.
 
-✅ **Funcional e pronto para uso**
-- Síntese de voz com Piper TTS real (português brasileiro)
-- Download de áudio em WAV (16-bit PCM mono 22050 Hz)
-- Controle de velocidade (acessibilidade para idosos - até 75% mais devagar)
-- API REST moderna com FastAPI
-- Containerizado com Docker Compose
-
----
-
-## 📋 Índice Rápido
-
-### Usuário Final
-1. [Setup Rápido](#-setup-rápido)
-2. [Como Usar](#-como-usar)
-3. [Velocidade de Áudio](#-velocidade-de-áudio)
-4. [Endpoints](#-endpoints)
-
-### Desenvolvedor
-5. [Estrutura do Projeto](#-estrutura-do-projeto)
-6. [Desenvolvimento](#-desenvolvimento)
-7. [Variáveis de Ambiente](#-variáveis-de-ambiente)
-8. [Testes](#-testes)
-9. [Docker](#-docker)
-10. [Troubleshooting](#-troubleshooting)
-
-### Arquitetura & Roadmap
-11. [Arquitetura](#-arquitetura)
-12. [Roadmap](#-roadmap)
-13. [Próximos Passos](#-próximos-passos)
-14. [Acessibilidade](#-acessibilidade)
+Este documento descreve a API **e a integração completa** com o NovoSGA e o painel de senhas.
 
 ---
 
-## Setup Rápido
+## Sumário
 
-### 1. Com Docker (Recomendado)
-
-```bash
-cp .env.example .env
-docker compose up
-```
-
-A API estará em `http://localhost:8082`
-
-Antes de subir, gere ou cole um token JWT no arquivo `.env` usando o `JWT_SECRET_KEY`.
-
-### 2. Local (Python 3.11+)
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-
-# Copiar variáveis de ambiente
-cp .env.example .env
-
-# Rodar
-uvicorn hu_speaker.main:app --reload
-```
+- [Visão geral da integração](#visão-geral-da-integração)
+- [Arquitetura](#arquitetura)
+- [Como funciona a autenticação (JWT)](#como-funciona-a-autenticação-jwt)
+- [Endpoints da API](#endpoints-da-api)
+- [Passo a passo de execução](#passo-a-passo-de-execução)
+- [Configuração (variáveis de ambiente)](#configuração-variáveis-de-ambiente)
+- [Velocidade da voz](#velocidade-da-voz)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Solução de problemas](#solução-de-problemas)
 
 ---
 
-## Como Usar
+## Visão geral da integração
 
-### cURL
+A solução é composta por **três serviços independentes** que se comunicam entre si. O HU-Speaker é a
+peça de voz; os outros dois já existiam no ecossistema NovoSGA e foram adaptados para conversar com
+ele.
 
-#### 1. Sintetizar Áudio
+| Serviço | O que é | Porta | Tecnologia |
+|---|---|---|---|
+| **NovoSGA** | Sistema de gestão de senhas/filas | `8081` | PHP 7.2 + PostgreSQL |
+| **HU-Speaker** | API de síntese de voz (este projeto) | `8082` | Python 3.11 + FastAPI + Piper |
+| **Painel** | Tela de chamada (TV da sala de espera) | `9000` | Web (AngularJS 1.x) |
 
-```bash
-curl -X POST http://localhost:8082/speak/synthesize \
-  -H "Authorization: Bearer <seu-jwt-aqui>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Bem-vindo ao HU-Speaker",
-    "language": "pt_BR",
-    "length_scale": 1.0
-  }'
-```
+O fluxo de uma chamada de paciente:
 
-**Resposta:**
-```json
-{
-  "id": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
-  "text": "Bem-vindo ao HU-Speaker",
-  "language": "pt_BR",
-  "status": "completed"
-}
-```
+1. No **NovoSGA**, um atendente chama a próxima senha (que carrega o nome do paciente no campo
+   `nm_cli`).
+2. O **painel** — que consulta o NovoSGA periodicamente — detecta a senha chamada e a exibe na TV.
+3. O painel vocaliza a **senha e o local** com áudios pré-gravados (ex.: "senha A, zero, zero, um,
+   guichê dois").
+4. Em seguida, o painel envia o **nome do paciente** ao **HU-Speaker**, recebe o áudio sintetizado e
+   o reproduz (ex.: "João da Silva").
 
-#### 2. Baixar Áudio
-
-```bash
-curl -o audio.wav \
-  -H "Authorization: Bearer <seu-jwt-aqui>" \
-  http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
-```
-
-#### 3. Verificar Status
-
-```bash
-curl \
-  -H "Authorization: Bearer <seu-jwt-aqui>" \
-  http://localhost:8082/speak/status/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
-```
-
-### Postman
-
-1. **Importar a collection**:
-   - Abra Postman → **File > Import**
-   - Selecione `postman_collection.json`
-
-2. **Usar as requisições prontas**:
-   - "Synthesize - Curto" (velocidade normal)
-   - "Synthesize - Para Idosos" (40% mais devagar)
-   - "Download Audio" (baixar WAV)
-
-Veja [Configurar Variáveis](#variáveis-no-postman) para automatizar o fluxo.
-
-#### Variáveis no Postman
-
-1. Clique em **Environments** (canto inferior esquerdo)
-2. Crie um novo environment com:
-   ```
-   base_url: http://localhost:8082
-   synthesis_id: (será preenchido automaticamente)
-   ```
-
-3. Nas URLs, use: `{{base_url}}/speak/synthesize`
-
-4. Preencha as variáveis do environment:
-  - `jwt_token`: JWT assinado com o `JWT_SECRET_KEY`
-  - Claims sugeridas: `sub`, `source_system`, `actor_id`, `actor_name`, `actor_role`, `request_id`, `exp`
-
-Exemplo para gerar um token manualmente:
-
-```bash
-/usr/bin/python3 - <<'PY'
-from datetime import datetime, timedelta, timezone
-import jwt
-
-payload = {
-   "sub": "novosga-service",
-   "source_system": "novosga",
-   "actor_id": "123",
-   "actor_name": "Maria Silva",
-   "actor_role": "attendant",
-   "request_id": "req-001",
-   "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
-}
-
-print(jwt.encode(payload, "your-super-secret-jwt-key-change-in-production", algorithm="HS256"))
-PY
-```
+> **Observação:** a integração entre o NovoSGA e o painel é natural — ambos fazem parte do mesmo
+> ecossistema NovoSGA. O foco técnico desta documentação é a integração desses dois com o
+> **HU-Speaker**, que é o componente novo.
 
 ---
 
-## Velocidade de Áudio
+## Arquitetura
 
-Use o parâmetro `length_scale` para adaptar a velocidade:
-
-| Valor | Velocidade | Caso de Uso |
-|-------|-----------|-----------|
-| **0.5** | 50% rápido | Áudio acelerado |
-| **0.8** | 20% rápido | Um pouco mais rápido |
-| **1.0** | Normal | ✅ Padrão (natural) |
-| **1.3** | 30% devagar | Compreensão melhorada |
-| **1.4** | 40% devagar | ✅ **Ideal para idosos** |
-| **1.5-2.0** | Muito devagar | Deficiência auditiva severa |
-
-### Exemplos
-
-**Pra idosos:**
-```bash
-curl -X POST http://localhost:8082/speak/synthesize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Paciente número 45",
-    "language": "pt_BR",
-    "length_scale": 1.4
-  }'
+```
+                            ┌──────────────────────────────┐
+                            │          NAVEGADOR           │
+                            │      (TV da sala de espera)  │
+                            │                              │
+                            │   Painel de senhas (:9000)   │
+                            └──────────────────────────────┘
+                                │    ▲             │    ▲
+              1. consulta senhas │    │ senha+nome  │    │ 4. áudio (WAV)
+                                 ▼    │             ▼    │
+        ┌───────────────────────────┐    ┌───────────────────────────────┐
+        │        NovoSGA (:8081)     │    │      HU-Speaker (:8082)       │
+        │  - filas, senhas, nm_cli   │    │  - POST /speak/synthesize     │
+        │  - /api/painel/{unidade}   │    │  - GET  /speak/download/{id}  │
+        │  - /painel-token.php  ─────┼───▶│  (valida o JWT assinado com   │
+        │    (emite JWT curto)       │ 3. │   o segredo compartilhado)    │
+        └───────────────────────────┘token└───────────────────────────────┘
+                        │                              ▲
+                        │  2. painel pede um token     │
+                        └──────────────────────────────┘
+                            (segredo JWT compartilhado)
 ```
 
-**Aprendizado de língua:**
-```bash
-curl -X POST http://localhost:8082/speak/synthesize \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Isso é uma frase em português",
-    "language": "pt_BR",
-    "length_scale": 1.5
-  }'
-```
+Pontos-chave da arquitetura:
+
+- **O áudio é reproduzido no navegador** (a TV), não no servidor.
+- **A autenticação é por JWT**, mas o segredo nunca vai para o navegador. O NovoSGA — que é
+  server-side — emite tokens curtos que o painel usa.
+- Os três serviços rodam em contêineres Docker e compartilham uma **rede Docker externa** chamada
+  `sga-net`, o que permite que se enxerguem pelo nome do serviço.
 
 ---
 
-## Endpoints
+## Como funciona a autenticação (JWT)
+
+Todos os endpoints de síntese exigem um **JWT HS256** válido, assinado com o segredo
+`JWT_SECRET_KEY` e contendo os claims obrigatórios `sub` e `exp`.
+
+É importante distinguir dois conceitos:
+
+- **`JWT_SECRET_KEY` (o segredo):** uma string fixa, **permanente**, usada para assinar e verificar os
+  tokens. Fica **apenas no servidor** (no NovoSGA e no HU-Speaker) e precisa ser **idêntica** nos dois.
+  Nunca é enviada ao navegador nem versionada no Git.
+- **Token JWT:** gerado a partir do segredo, com validade **curta** (5 minutos). É descartável — se
+  vazar, expira rápido.
+
+O painel roda no navegador e **não** pode guardar o segredo. Por isso, ele obtém tokens curtos
+dinamicamente:
+
+1. Antes de sintetizar, o painel chama `GET http://localhost:8081/painel-token.php` (no NovoSGA).
+2. O NovoSGA assina um JWT de 5 minutos com o `JWT_SECRET_KEY` e o devolve.
+3. O painel usa esse token para chamar o HU-Speaker.
+4. Quando o token expira, o painel busca outro automaticamente (e trata `401` renovando o token).
+
+Para o áudio (`GET /speak/download/{id}`), o token também é aceito via **query string**
+(`?token=<jwt>`), porque o navegador não envia cabeçalhos ao reproduzir áudio por um elemento
+`<audio>`.
+
+---
+
+## Endpoints da API
+
+Todos exigem autenticação, exceto o health check.
 
 ### `POST /speak/synthesize`
-
 Sintetiza um texto em áudio.
 
-**Body (JSON):**
+**Cabeçalho:** `Authorization: Bearer <jwt>`
+**Corpo (JSON):**
 ```json
-{
-  "text": "Seu texto aqui",
-  "language": "pt_BR",
-  "length_scale": 1.0
-}
+{ "text": "João da Silva", "language": "pt_BR", "length_scale": 1.6 }
 ```
-
-**Parâmetros:**
-- `text` (obrigatório): 1-1000 caracteres
-- `language` (opcional): Idioma. Padrão: `"pt_BR"`
-- `length_scale` (opcional): Velocidade (0.5-2.0). Padrão: `1.0`
+- `text` (obrigatório): 1–1000 caracteres.
+- `language` (opcional): padrão `"pt_BR"`.
+- `length_scale` (opcional): velocidade da fala, 0.5–2.0. Padrão `1.0` (maior = mais devagar).
 
 **Resposta:**
 ```json
-{
-  "id": "uuid",
-  "text": "Seu texto aqui",
-  "language": "pt_BR",
-  "status": "completed"
-}
+{ "id": "798d5acd-...", "text": "João da Silva", "language": "pt_BR", "status": "completed" }
 ```
-
----
 
 ### `GET /speak/download/{id}`
-
-Baixa o arquivo WAV sintetizado.
-
-**Exemplo:**
-```bash
-curl -o audio.wav http://localhost:8082/speak/download/798d5acd-bb00-46de-b6b1-6a8d139d7a0f
-```
-
-**Formato:** WAVE PCM 16-bit mono 22050 Hz
-
-**Cabeçalhos obrigatórios:**
-```bash
-X-API-Key: change-me-in-production
-X-Source-System: novosga
-X-Actor-Id: 123
-X-Actor-Name: Maria Silva
-X-Actor-Role: attendant
-X-Request-Id: req-001
-```
-
-### `DELETE /speak/{id}`
-
-Exclui imediatamente o arquivo WAV sintetizado e remove os metadados em memória.
-
-**Resposta:**
-```json
-{
-  "id": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
-  "status": "deleted",
-  "message": "Audio deleted successfully"
-}
-```
-
----
+Devolve o arquivo de áudio WAV (PCM 16-bit, mono, 22050 Hz).
+Aceita o token no cabeçalho `Authorization` **ou** na query string `?token=<jwt>`.
 
 ### `GET /speak/status/{id}`
+Consulta o status de uma síntese.
 
-Retorna o status de uma síntese.
-
-**Resposta:**
-```json
-{
-  "id": "798d5acd-bb00-46de-b6b1-6a8d139d7a0f",
-  "status": "completed"
-}
-```
-
----
-
-## Variáveis de Ambiente
-
-As principais variáveis do fluxo de áudio são:
-
-- `AUDIO_OUTPUT_DIR=/tmp/hu-speaker-audio`
-- `ENABLE_CLEANUP=true`
-- `CLEANUP_TTL_MINUTES=10`
-- `CLEANUP_INTERVAL_SECONDS=60`
-
-Com isso, os arquivos WAV ficam em um diretório temporário e a limpeza roda com retenção máxima aproximada de 10 a 11 minutos, dependendo do intervalo de execução.
-
----
+### `DELETE /speak/{id}`
+Remove imediatamente o áudio e seus metadados.
 
 ### `GET /health`
+Verificação de saúde do serviço. Não requer autenticação.
 
-Health check da API.
-
-**Resposta:**
-```json
-{
-  "status": "ok"
-}
-```
+> Os áudios ficam em um diretório temporário em memória (tmpfs) e são apagados automaticamente após
+> ~10 minutos — tempo mais que suficiente para uma chamada de senha.
 
 ---
 
-### `GET /health/ready`
+## Passo a passo de execução
 
-Readiness check (verifica se a API está pronta).
+O objetivo é subir os três serviços de forma que se comuniquem. Assume-se que os três repositórios
+estão em `~/projetos/` (`novosga-HU`, `HU-Speaker`, `novosga-panel-hu`).
+
+### 1. Criar a rede Docker compartilhada (uma única vez)
+```bash
+docker network create sga-net
+```
+(se já existir, o comando avisa — pode ignorar.)
+
+### 2. Definir o segredo JWT compartilhado
+O NovoSGA e o HU-Speaker precisam do **mesmo** `JWT_SECRET_KEY`.
+
+No **HU-Speaker**, ele fica no `.env`:
+```bash
+cd ~/projetos/HU-Speaker
+cp .env.example .env
+# edite o .env e defina um valor forte em JWT_SECRET_KEY
+```
+
+No **NovoSGA**, o mesmo valor é fornecido por variável de ambiente (o `docker-compose.yml` do NovoSGA
+lê `JWT_SECRET_KEY` do host). A forma mais prática é criar um `.env` na pasta do NovoSGA com o mesmo
+valor:
+```bash
+echo 'JWT_SECRET_KEY=<o-mesmo-segredo-do-hu-speaker>' >> ~/projetos/novosga-HU/.env
+```
+> **Nunca** versione esse segredo. Garanta que o `.env` está no `.gitignore`.
+
+### 3. Subir o HU-Speaker
+```bash
+cd ~/projetos/HU-Speaker
+docker compose up -d --build
+```
+Verifique: `curl http://localhost:8082/health` deve responder `{"status":"ok"}`.
+
+### 4. Subir o NovoSGA
+```bash
+cd ~/projetos/novosga-HU
+docker compose up -d
+```
+
+### 5. Servir o painel
+```bash
+cd ~/projetos/novosga-panel-hu
+php -S 0.0.0.0:9000
+```
+Abra `http://localhost:9000` e configure a URL do NovoSGA (`http://localhost:8081`), a unidade, os
+serviços e ative a vocalização (incluindo o nome).
+
+### 6. Validar a integração ponta a ponta
+```bash
+# o NovoSGA emite um token…
+TOKEN=$(curl -s http://localhost:8081/painel-token.php | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+# …e o HU-Speaker deve aceitá-lo (esperado: 200)
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8082/speak/synthesize \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"text":"teste","language":"pt_BR"}'
+```
+Se retornar **200**, os segredos batem e a autenticação está funcionando. Ao chamar uma senha (com
+nome preenchido) no NovoSGA, o painel deve falar a senha e, em seguida, o nome do paciente.
 
 ---
 
-## Estrutura
+## Configuração (variáveis de ambiente)
+
+Definidas no `.env` do HU-Speaker (veja `.env.example`):
+
+| Variável | Descrição | Exemplo |
+|---|---|---|
+| `JWT_SECRET_KEY` | Segredo de assinatura dos tokens (igual ao do NovoSGA) | *(string forte)* |
+| `CORS_ORIGINS` | Origens permitidas a chamar a API (inclui o painel) | `http://localhost:9000` |
+| `PIPER_MODEL` | Modelo de voz Piper | `pt_BR-faber-medium.onnx` |
+| `AUDIO_OUTPUT_DIR` | Diretório temporário dos áudios | `/tmp/hu-speaker-audio` |
+| `CLEANUP_TTL_MINUTES` | Minutos até apagar cada áudio | `10` |
+
+> **CORS:** como o painel (`:9000`) e a API (`:8082`) têm origens diferentes, a origem do painel
+> precisa estar em `CORS_ORIGINS`, senão o navegador bloqueia a chamada.
+
+---
+
+## Velocidade da voz
+
+O parâmetro `length_scale` ajusta a velocidade da fala (útil para acessibilidade):
+
+| Valor | Efeito |
+|---|---|
+| `1.0` | Velocidade natural |
+| `1.4` | ~40% mais devagar |
+| `1.6` | Mais devagar (bom para nomes em ambiente de espera) |
+| `2.0` | Bem devagar |
+
+Valores **maiores** deixam a fala **mais lenta**. No painel, esse valor é configurável.
+
+---
+
+## Estrutura do projeto
 
 ```
-.
+HU-Speaker/
+├── src/hu_speaker/
+│   ├── app.py                 # cria o app FastAPI (inclui o middleware de CORS)
+│   ├── main.py                # ponto de entrada (uvicorn)
+│   ├── core/
+│   │   ├── config.py          # configurações (env)
+│   │   └── security.py        # validação do JWT (header ou ?token=)
+│   └── modules/
+│       ├── health/            # /health
+│       └── speaker/           # síntese, download, status, delete, limpeza
+├── docker-compose.yml         # serviço na rede sga-net, tmpfs para os áudios
 ├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-├── postman_collection.json    # 👈 Importar no Postman
-├── scripts/
-│   └── integration_test.py     # Teste end-to-end
-├── src/
-│   └── hu_speaker/
-│       ├── __init__.py
-│       ├── main.py             # Entry point
-│       ├── app.py              # Factory da aplicação
-│       ├── core/
-│       │   ├── config.py        # Configurações (Pydantic)
-│       │   └── exceptions.py    # Exceções customizadas
-│       └── modules/
-│           ├── common/          # Rotas genéricas
-│           ├── health/          # Health checks
-│           └── speaker/         # TTS (síntese)
-│               ├── controller.py
-│               ├── service.py
-│               ├── schemas.py   # DTOs
-│               └── router.py
-└── tests/
-    ├── integration/
-    └── unit/
-```
-
-### Arquitetura
-
-O projeto segue um padrão **modular inspirado em NestJS**:
-
-- **Core**: Configurações centrais, exceções
-- **Modules**: Funcionalidades independentes com:
-  - `controller.py` - Orquestração de requisições
-  - `service.py` - Lógica de negócio
-  - `router.py` - Rotas FastAPI
-  - `schemas.py` - Validação (Pydantic DTOs)
-
----
-
-## 👨‍💻 Desenvolvimento
-
-### Variáveis de Ambiente
-
-**Setup inicial:**
-```bash
-cp .env.example .env
-```
-
-**Arquivo `.env` (NUNCA comitar):**
-- Contém dados sensíveis
-- Está no `.gitignore`
-- Use valores reais em desenvolvimento/produção
-
-**Arquivo `.env.example` (SEMPRE comitar):**
-- Template com valores de exemplo
-- Seguro compartilhar
-- Referência para novos desenvolvedores
-
-### Principais Variáveis
-
-| Variável | Exemplo | Descrição |
-|----------|---------|-----------|
-| `DEBUG` | `true` | Reload automático em dev |
-| `ENVIRONMENT` | `development` | `development`, `staging`, `production` |
-| `PORT` | `8082` | Porta da API |
-| `PIPER_MODEL` | `pt_BR-faber-medium.onnx` | Modelo TTS |
-| `AUDIO_OUTPUT_DIR` | `/tmp/hu-speaker-audio` | Onde salvar WAVs |
-| `JWT_SECRET_KEY` | (gerar nova) | Chave secreta JWT |
-| `HIS_API_URL` | (seu HIS) | URL do Sistema de Informação Hospitalar |
-| `HIS_API_KEY` | (seu token) | Token de autenticação HIS |
-| `SMTP_HOST`, `SMTP_PORT` | (seu SMTP) | Para enviar emails |
-| `DATABASE_URL` | (PostgreSQL) | Para quando implementar BD |
-
-### Gerar JWT_SECRET_KEY (Produção)
-
-```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+└── .env.example
 ```
 
 ---
 
-## 🧪 Testes
-
-**Integration test (recomendado):**
-```bash
-python3 scripts/integration_test.py
-```
-
-Valida:
-- ✅ POST /speak/synthesize
-- ✅ GET /speak/download/{id} retorna WAV válido
-- ✅ Arquivo contém áudio real
-- ✅ GET /speak/status/{id}
-
-**Unit tests:**
-```bash
-pytest tests/unit/
-```
-
-**Qualidade de código:**
-```bash
-ruff check .      # Linting
-mypy src          # Type checking
-```
-
----
-
-## Docker
-
-### Build
-
-```bash
-docker build -t hu-speaker .
-```
-
-### Run
-
-```bash
-docker run --rm -p 8082:8082 hu-speaker
-```
-
-### Compose
-
-```bash
-# Iniciar
-docker compose up
-
-# Rebuild
-docker compose up --build
-
-# Parar
-docker compose down
-
-# Logs
-docker compose logs -f hu-speaker
-```
-
----
-
-## Troubleshooting
-
-| Problema | Solução |
-|----------|---------|
-| `Connection refused` | Certifique `docker compose up -d` está rodando |
-| `400 Bad Request` | Verifique JSON válido no Body |
-| `404 Not Found` | ID expirou, resintetize |
-| `empty WAV file` | ❌ BUG FIXO - usamos `synthesize_wav()` agora |
-
----
-
-## 📚 Documentação Adicional
-
-- **[ENVIRONMENT.md](ENVIRONMENT.md)** - Todas as variáveis de ambiente
-- **[ROADMAP.md](ROADMAP.md)** - Plano de desenvolvimento (7 fases)
-- **[NEXT_STEPS.md](NEXT_STEPS.md)** - Próximas ações recomendadas
-
----
-
-## 📚 Documentação
-
-Esta API foi desenvolvida com foco em **inclusão social**:
-
-✅ **Controle de velocidade**: Idosos e deficientes auditivos (até 75% mais devagar)  
-✅ **Áudio claro**: 16-bit PCM 22050 Hz (qualidade de voz natural)  
-✅ **Integração fácil**: JSON simples, sem complexidade  
-✅ **Download de áudio**: Compatível com qualquer player  
-
-### Casos de Uso
-
-| Grupo | length_scale | Razão |
-|-------|-------------|-------|
-| Pessoa com audição normal | 1.0 | Velocidade natural |
-| Idoso | 1.4 | Compreensão facilitada |
-| Deficiência auditiva | 1.5-2.0 | Velocidade muito reduzida |
-| Estudando português | 1.3-1.5 | Melhor absorção de pronúncia |
-
----
-
-## 🛣️ Roadmap
-
-### ✅ Fase 1: Core (CONCLUÍDO)
-
-- [x] Piper TTS real funcional
-- [x] Download de áudio WAV
-- [x] Controle de velocidade (acessibilidade)
-- [x] Docker + Docker Compose
-- [x] Testes de integração
-
-### 🔄 Fase 2: Segurança & Dados (Próximas 2-4 semanas)
-
-- [ ] Autenticação JWT
-- [ ] Banco de dados PostgreSQL
-- [ ] Logging e auditoria (LGPD/HIPAA)
-- [ ] Rate limiting (proteção contra abuso)
-
-### 📅 Fase 3: Integração Hospitalar (4-8 semanas)
-
-- [ ] Integração com HIS (Sistema de Informação Hospitalar)
-- [ ] Sincronização de pacientes
-- [ ] Webhooks para notificações
-
-### 🚀 Fase 4: Performance (8-12 semanas)
-
-- [ ] Fila de processamento (Celery + Redis)
-- [ ] Cache de sínteses
-- [ ] Processamento paralelo
-
-### 📊 Fase 5: Observabilidade (12-16 semanas)
-
-- [ ] Prometheus (métricas)
-- [ ] Grafana (dashboards)
-- [ ] ELK Stack (logs centralizados)
-- [ ] Sentry (error tracking)
-
-### 🐳 Fase 6: Infraestrutura (16-20 semanas)
-
-- [ ] Kubernetes manifests
-- [ ] Helm charts
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Staging + Production
-
-### 📚 Fase 7: Documentação (20+ semanas)
-
-- [ ] API docs completa
-- [ ] Developer guide
-- [ ] Deployment runbook
-- [ ] Disaster recovery plan
-
----
-
-## 📝 Próximos Passos (Sprint 1)
-
-### IMEDIATO (próximas 2 semanas)
-
-#### Prioridade 1: Autenticação JWT
-```bash
-# Criar módulo auth/
-src/hu_speaker/modules/auth/
-├── controller.py
-├── service.py
-├── schemas.py
-└── router.py
-```
-
-- [ ] `POST /auth/login` - Login com email/senha
-- [ ] `POST /auth/refresh` - Renovar token
-- [ ] Validar token em endpoints protegidos
-- [ ] Hash de senhas com `passlib`
-
-#### Prioridade 2: Banco de Dados
-- [ ] Adicionar `sqlalchemy`, `psycopg2`, `alembic`
-- [ ] Criar models: User, AudioLog, CallRecord
-- [ ] PostgreSQL no Docker Compose
-- [ ] Migrations automáticas
-
-#### Prioridade 3: Testes Completos (80%+ coverage)
-- [ ] Unit tests para todos os services
-- [ ] Testes de integração (mocks de Piper)
-- [ ] Testes de autenticação
-- [ ] CI/CD básico (GitHub Actions)
-
-### Checklist Sprint 1
-
-```
-Code Quality:
-  [ ] 80%+ test coverage
-  [ ] ruff/mypy sem erros
-  [ ] bandit security scan passing
-
-Documentation:
-  [ ] ✅ README completo
-  [ ] Swagger descriptions
-  [ ] Developer guide
-
-Security:
-  [ ] JWT autenticação
-  [ ] Senhas hashadas
-  [ ] Input validation
-
-Deployment:
-  [ ] ✅ Docker funcional
-  [ ] [ ] CI/CD pipeline basic
-  [ ] [ ] Production checklist
-```
-
-### Como Começar
-
-```bash
-# 1. Clonar e setup
-git clone <repo>
-cd HU-Speaker
-cp .env.example .env
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-
-# 2. Rodar em dev
-docker compose up --build
-
-# 3. Verificar status
-curl http://localhost:8082/health
-
-# 4. Começar implementação (ex: JWT)
-git checkout -b feat/jwt-auth
-# ... editar código ...
-pytest tests/ -v
-git commit -m "feat: add jwt authentication"
-```
-
----
-
-## 📐 Arquitetura
-
-O projeto segue um padrão **modular inspirado em NestJS**:
-
-```
-Request HTTP
-    ↓
-Router (router.py)
-    ↓
-Controller (controller.py) ← Orquestração
-    ↓
-Service (service.py) ← Lógica de Negócio
-    ↓
-Piper TTS / Database / Externos
-```
-
-**Benefícios:**
-- ✅ Fácil de testar (mock de service)
-- ✅ Separação de responsabilidades
-- ✅ Reutilizável em diferentes contextos
-- ✅ Escalável
-
----
-
-## 🔐 Segurança em Produção
-
-### Checklist de Deploy
-
-- [ ] Gerar novo `JWT_SECRET_KEY`
-- [ ] `DEBUG=false`
-- [ ] `ENVIRONMENT=production`
-- [ ] Usar HTTPS/TLS (certificado SSL válido)
-- [ ] Rate limiting habilitado
-- [ ] Logs centralizados
-- [ ] Backup do banco de dados
-- [ ] Monitoramento ativo (Prometheus/Grafana)
-- [ ] Auditoria de acesso (LGPD/HIPAA)
-- [ ] Disaster recovery plan
-
-### Variáveis de Produção
-
-```bash
-# Seguras vs Inseguras
-ENVIRONMENT=production              # ✅ (não development)
-DEBUG=false                         # ✅ (não true)
-JWT_SECRET_KEY=<gerar_novo>         # ✅ (não default)
-DATABASE_URL=postgresql://...       # ✅ (passworded)
-ALLOWED_HOSTS=api.hospital.local    # ✅ (específico)
-```
-
----
-
-## 📞 Suporte
-
-### Reportar Bugs
-
-1. Descreva o problema com detalhe
-2. Inclua versão da API: `curl http://localhost:8082/health`
-3. Incluia logs: `docker compose logs hu-speaker`
-4. Abra issue no GitHub
-
-### Dúvidas?
-
-- 📖 Leia [README.md](#) (você está aqui!)
-- 🔧 Veja [Troubleshooting](#-troubleshooting)
-- 💬 Abra uma issue no GitHub
-
----
-
-## 📝 Licença
-
-[Veja LICENSE](LICENSE)
-
----
-
-## 👥 Autores
-
-Desenvolvido para o **Hospital Universitário da UFGD** (Rede Ebserh/MS)
-
-### Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feat/feature-name`)
-3. Commit suas mudanças (`git commit -m "feat: descrição"`)
-4. Push (`git push origin feat/feature-name`)
-5. Abra Pull Request
-
----
-
-**Última atualização:** 29 de Abril de 2026
-
-✨ Built with ❤️ for Hospital Universitário UFGD
+## Solução de problemas
+
+**O painel não fala o nome, mas fala a senha.**
+Abra o console do navegador (F12). As causas mais comuns:
+- **CORS** (`blocked by CORS policy`): a origem do painel não está em `CORS_ORIGINS`. Ajuste o `.env`
+  do HU-Speaker e reinicie.
+- **401**: o `JWT_SECRET_KEY` do NovoSGA e do HU-Speaker estão diferentes. Eles precisam ser idênticos.
+
+**`net::ERR_FAILED` / falha ao chamar o HU-Speaker.**
+Verifique se o container está no ar (`curl http://localhost:8082/health`) e se ambos estão na rede
+`sga-net`.
+
+**O áudio do nome não toca (mas foi gerado).**
+No navegador, a reprodução de áudio automático é bloqueada até haver uma interação do usuário com a
+página. Em uma TV real isso não é problema (há uma interação ao configurar o painel).
+
+**O nome sai com pronúncia estranha em siglas coladas a números (ex.: "A001").**
+A API já pré-processa esses casos separando letra e dígitos ("A, zero, zero, um"). Nomes de pessoas
+não sofrem esse problema.
