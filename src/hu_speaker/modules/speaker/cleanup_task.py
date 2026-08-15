@@ -2,7 +2,6 @@
 
 import time
 from pathlib import Path
-from typing import Optional
 
 
 def cleanup_old_audio_files(audio_dir: str, ttl_minutes: int = 5) -> int:
@@ -37,7 +36,7 @@ def cleanup_old_audio_files(audio_dir: str, ttl_minutes: int = 5) -> int:
     return deleted_count
 
 
-def get_audio_dir_stats(audio_dir: str) -> Optional[dict]:
+def get_audio_dir_stats(audio_dir: str) -> dict[str, float] | None:
     """Retorna estatísticas do diretório de áudio.
     
     Args:

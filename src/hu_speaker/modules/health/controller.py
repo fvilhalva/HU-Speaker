@@ -14,6 +14,6 @@ class HealthController:
         """Retorna o status de saúde da aplicação."""
         return self.service.check_status()
 
-    def get_readiness(self) -> dict[str, str]:
+    def get_readiness(self) -> dict[str, bool]:
         """Retorna o status de prontidão da aplicação."""
         return self.service.check_readiness()

@@ -2,8 +2,8 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status  # type: ignore[import]
-from fastapi.responses import FileResponse  # type: ignore[import]
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 
 from hu_speaker.core.security import AuthContext, require_service_jwt
 from hu_speaker.modules.speaker.controller import SpeakerController
@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/synthesize", response_model=SynthesisResponse)
-def synthesize(request: SynthesisRequest, auth: AuthContext = Depends(require_service_jwt)) -> SynthesisResponse:
+def synthesize(
+    request: SynthesisRequest, auth: AuthContext = Depends(require_service_jwt)
+) -> SynthesisResponse:
     """Sintetiza um texto em áudio."""
     logger.info(
         "Synthesis requested",
@@ -32,7 +34,9 @@ def synthesize(request: SynthesisRequest, auth: AuthContext = Depends(require_se
 
 
 @router.get("/status/{synthesis_id}", response_model=dict[str, str])
-def get_synthesis_status(synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)) -> dict[str, str]:
+def get_synthesis_status(
+    synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)
+) -> dict[str, str]:
     """Obtém o status de uma síntese."""
     logger.info(
         "Status check",
@@ -46,7 +50,9 @@ def get_synthesis_status(synthesis_id: str, auth: AuthContext = Depends(require_
 
 
 @router.get("/download/{synthesis_id}")
-def download_audio(synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)) -> FileResponse:
+def download_audio(
+    synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)
+) -> FileResponse:
     """Baixa o arquivo WAV sintetizado."""
     try:
         audio_path = speaker_controller.service.get_audio_file(synthesis_id)
@@ -70,7 +76,9 @@ def download_audio(synthesis_id: str, auth: AuthContext = Depends(require_servic
 
 
 @router.delete("/{synthesis_id}", response_model=DeletionResponse)
-def delete_audio(synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)) -> DeletionResponse:
+def delete_audio(
+    synthesis_id: str, auth: AuthContext = Depends(require_service_jwt)
+) -> DeletionResponse:
     """Exclui o arquivo WAV sintetizado e seus metadados."""
     try:
         speaker_controller.delete_audio(synthesis_id)

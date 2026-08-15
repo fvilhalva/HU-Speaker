@@ -1,6 +1,6 @@
 """Ponto de entrada da aplicação."""
 
-import uvicorn  # type: ignore[import]
+import uvicorn
 
 from hu_speaker.app import create_app
 from hu_speaker.core.config import get_settings

@@ -1,6 +1,6 @@
 """Exceções customizadas da aplicação."""
 
-from fastapi import HTTPException, status # type: ignore[import]
+from fastapi import HTTPException, status
 
 
 class APIException(HTTPException):

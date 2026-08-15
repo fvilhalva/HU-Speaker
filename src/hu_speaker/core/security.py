@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fastapi import Header, HTTPException, Query, status  # type: ignore[import]
 import jwt
+from fastapi import Header, HTTPException, Query, status
 from jwt import InvalidTokenError
 
 from hu_speaker.core.config import get_settings
@@ -51,7 +51,9 @@ def require_service_jwt(
             options={"require": ["exp", "sub"]},
         )
     except InvalidTokenError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        ) from exc
 
     return AuthContext(
         subject=str(payload["sub"]),

@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings # type: ignore[import]
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -63,9 +63,12 @@ class Settings(BaseSettings):
 
         env_file = ".env"
         case_sensitive = True
+        # Ignora variáveis extras no ambiente/.env (ex.: chaves de teste ou
+        # config ainda não mapeada) em vez de derrubar a aplicação.
+        extra = "ignore"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Retorna as configurações da aplicação (cached)."""
     return Settings()
