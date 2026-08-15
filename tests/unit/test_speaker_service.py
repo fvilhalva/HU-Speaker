@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
-import wave
+from collections.abc import Iterator
 from pathlib import Path
 
 from hu_speaker.modules.speaker.service import SpeakerService
 
 
+class FakeChunk:
+    """Imita um AudioChunk do piper-tts 1.6.0 (bytes int16)."""
+
+    def __init__(self, data: bytes) -> None:
+        self.audio_int16_bytes = data
+
+
 class FakeVoice:
-    def synthesize_wav(self, text: str, wav_file: wave.Wave_write, syn_config=None) -> None:
-        wav_file.setframerate(22050)
-        wav_file.setsampwidth(2)
-        wav_file.setnchannels(1)
-        wav_file.writeframes(b"\x00\x00" * 22050)
+    def synthesize(self, text: str, syn_config: object = None) -> Iterator[FakeChunk]:
+        # 1s de silêncio PCM 16-bit mono @ 22050 Hz, em um único chunk.
+        yield FakeChunk(b"\x00\x00" * 22050)
 
 
 def test_speaker_service_synthesize(tmp_path: Path) -> None:

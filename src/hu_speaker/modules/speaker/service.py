@@ -7,20 +7,20 @@ import re
 import uuid
 import wave
 from pathlib import Path
-from typing import Any
-# Coqui TTS
-# from TTS.api import TTS
-# pip install TTS
-# from TTS.api import TTS
-try:
-    from piper import PiperVoice  # type: ignore[import]
-    from piper.config import SynthesisConfig  # type: ignore[import]
-except ImportError:  # pragma: no cover - depends on runtime environment
-    PiperVoice = Any
-    SynthesisConfig = Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from piper import PiperVoice
+    from piper.config import SynthesisConfig
+else:
+    try:
+        from piper import PiperVoice
+        from piper.config import SynthesisConfig
+    except ImportError:  # pragma: no cover - depends on runtime environment
+        PiperVoice = Any
+        SynthesisConfig = Any
 
 from hu_speaker.core.config import get_settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class SpeakerService:
         """
         # 1) Token de senha: uma ou mais letras seguidas de dígitos (ex.: "A001").
         #    Mantém a(s) letra(s) e soletra os dígitos separadamente.
-        def _repl_senha(m: re.Match) -> str:
+        def _repl_senha(m: re.Match[str]) -> str:
             letras, numeros = m.group(1), m.group(2)
             return f"{letras} {SpeakerService._spell_digits(numeros)}"
 
@@ -107,7 +107,9 @@ class SpeakerService:
 
         return result
 
-    def synthesize(self, text: str, language: str = "pt_BR", length_scale: float = 1.0) -> dict[str, str]:
+    def synthesize(
+        self, text: str, language: str = "pt_BR", length_scale: float = 1.0
+    ) -> dict[str, str]:
         """Sintetiza um texto em áudio.
         
         Args:
@@ -163,7 +165,10 @@ class SpeakerService:
         }
 
         self._syntheses[synthesis_id] = {**result, "audio_path": str(audio_path)}
-        logger.info("Audio synthesized", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
+        logger.info(
+            "Audio synthesized",
+            extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)},
+        )
         return result
 
     def get_synthesis_status(self, synthesis_id: str) -> dict[str, str]:
@@ -192,4 +197,7 @@ class SpeakerService:
             audio_path.unlink()
 
         self._syntheses.pop(synthesis_id, None)
-        logger.info("Audio deleted", extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)})
+        logger.info(
+            "Audio deleted",
+            extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)},
+        )

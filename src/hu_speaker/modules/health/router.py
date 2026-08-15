@@ -17,4 +17,4 @@ def get_health() -> dict[str, str]:
 @router.get("/ready", response_model=dict[str, bool])
 def get_readiness() -> dict[str, bool]:
     """Verifica se a aplicação está pronta."""
-    return health_controller.get_readiness()  # type: ignore[return-value]
+    return health_controller.get_readiness()

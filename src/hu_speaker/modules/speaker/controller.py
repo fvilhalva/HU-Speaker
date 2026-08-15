@@ -5,7 +5,6 @@ import logging
 from hu_speaker.modules.speaker.schemas import SynthesisRequest, SynthesisResponse
 from hu_speaker.modules.speaker.service import SpeakerService
 
-
 logger = logging.getLogger(__name__)
 
 

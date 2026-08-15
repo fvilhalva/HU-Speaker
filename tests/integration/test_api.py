@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import wave
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
 
-import pytest
 import jwt
+import pytest
 from fastapi.testclient import TestClient  # type: ignore[import]
 
 from hu_speaker.main import app  # type: ignore[import]
@@ -16,12 +16,17 @@ from hu_speaker.modules.speaker.controller import SpeakerController
 from hu_speaker.modules.speaker.service import SpeakerService
 
 
+class FakeChunk:
+    """Imita um AudioChunk do piper-tts 1.6.0 (bytes int16)."""
+
+    def __init__(self, data: bytes) -> None:
+        self.audio_int16_bytes = data
+
+
 class FakeVoice:
-    def synthesize_wav(self, text: str, wav_file: wave.Wave_write, syn_config=None) -> None:
-        wav_file.setframerate(22050)
-        wav_file.setsampwidth(2)
-        wav_file.setnchannels(1)
-        wav_file.writeframes(b"\x00\x00" * 22050)
+    def synthesize(self, text: str, syn_config: object = None) -> Iterator[FakeChunk]:
+        # 1s de silêncio PCM 16-bit mono @ 22050 Hz, em um único chunk.
+        yield FakeChunk(b"\x00\x00" * 22050)
 
 
 @pytest.fixture()
@@ -43,7 +48,7 @@ def auth_headers() -> dict[str, str]:
         "actor_name": "Maria Silva",
         "actor_role": "attendant",
         "request_id": "req-001",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "exp": datetime.now(UTC) + timedelta(minutes=5),
     }
     token = jwt.encode(payload, "test-jwt-secret", algorithm="HS256")
     return {

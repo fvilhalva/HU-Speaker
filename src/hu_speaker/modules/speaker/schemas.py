@@ -1,6 +1,6 @@
 """Schemas (DTOs) para o módulo de Speaker."""
 
-from pydantic import BaseModel, Field # type: ignore[import]
+from pydantic import BaseModel, Field
 
 
 class SynthesisRequest(BaseModel):
@@ -8,7 +8,12 @@ class SynthesisRequest(BaseModel):
 
     text: str = Field(..., min_length=1, max_length=1000, description="Texto a ser sintetizado")
     language: str = Field(default="pt_BR", description="Idioma para síntese")
-    length_scale: float = Field(default=1.0, ge=0.5, le=2.0, description="Velocidade do áudio (0.5=rápido, 1.0=normal, 2.0=devagar)")
+    length_scale: float = Field(
+        default=1.0,
+        ge=0.5,
+        le=2.0,
+        description="Velocidade do áudio (0.5=rápido, 1.0=normal, 2.0=devagar)",
+    )
 
 
 class SynthesisResponse(BaseModel):

@@ -1,31 +1,30 @@
 """Factory de criação da aplicação FastAPI."""
 
-import asyncio
 import time
 from threading import Thread
 
-from fastapi import FastAPI  # type: ignore[import]
-from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import]
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from hu_speaker.core.config import get_settings
+from hu_speaker.core.config import Settings, get_settings
 from hu_speaker.modules.common.router import router as common_router
 from hu_speaker.modules.health.router import router as health_router
 from hu_speaker.modules.speaker.router import router as speaker_router
 
 
-def start_cleanup_task(settings) -> Thread:
+def start_cleanup_task(settings: Settings) -> Thread | None:
     """Inicia thread de limpeza de arquivos antigos.
-    
+
     Args:
         settings: Objeto de configurações
-    
+
     Returns:
-        Thread daemon iniciada
+        Thread daemon iniciada, ou None se a limpeza estiver desabilitada
     """
     if not settings.ENABLE_CLEANUP:
         return None
-    
-    def cleanup_loop():
+
+    def cleanup_loop() -> None:
         from hu_speaker.modules.speaker.cleanup_task import (
             cleanup_old_audio_files,
             get_audio_dir_stats,
@@ -40,11 +39,12 @@ def start_cleanup_task(settings) -> Thread:
                 
                 if deleted > 0:
                     stats = get_audio_dir_stats(settings.AUDIO_OUTPUT_DIR)
-                    print(
-                        f"✅ Cleanup completed: {deleted} files removed | "
-                        f"Stats: {stats['file_count']} files, "
-                        f"{stats['total_size_mb']:.1f}MB total"
-                    )
+                    if stats is not None:
+                        print(
+                            f"✅ Cleanup completed: {deleted} files removed | "
+                            f"Stats: {stats['file_count']} files, "
+                            f"{stats['total_size_mb']:.1f}MB total"
+                        )
                 
             except Exception as e:
                 print(f"⚠️  Cleanup task error: {e}")
@@ -87,7 +87,7 @@ def create_app() -> FastAPI:
     # Iniciar task de limpeza de arquivos antigos
     if settings.ENABLE_CLEANUP:
         @app.on_event("startup")
-        def startup_cleanup():
+        def startup_cleanup() -> None:
             cleanup_thread = start_cleanup_task(settings)
             if cleanup_thread:
                 print(f"🗑️  Audio cleanup task started (TTL: {settings.CLEANUP_TTL_MINUTES}min)")
