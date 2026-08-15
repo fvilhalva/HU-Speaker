@@ -8,7 +8,7 @@ import jwt
 
 # Importar config do projeto
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from src.hu_speaker.core.config import get_settings
+from src.hu_speaker.core.config import get_settings  # noqa: E402
 
 
 def generate_token(
@@ -59,7 +59,7 @@ def main():
     print("  curl -X POST http://localhost:8082/speak/synthesize \\")
     print("    -H 'Authorization: Bearer " + token + "' \\")
     print("    -H 'Content-Type: application/json' \\")
-    print("    -d '{\"text\": \"Olá\", \"language\": \"pt-BR\"}'")
+    print("    -d '{\"text\": \"Olá\", \"language\": \"pt_BR\"}'")
     print()
 
 
