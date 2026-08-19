@@ -1,4 +1,9 @@
-"""Service de Speaker (Síntese de Voz)."""
+"""Service de Speaker (Síntese de Voz).
+
+Orquestra a síntese: pré-processa o texto, escolhe a *engine* de TTS
+(Piper, Kokoro, ...) conforme o modelo pedido, grava o WAV e mantém os
+metadados. O que é específico de cada motor vive em ``engines/``.
+"""
 
 from __future__ import annotations
 
@@ -7,26 +12,22 @@ import re
 import uuid
 import wave
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from piper import PiperVoice
-    from piper.config import SynthesisConfig
-else:
-    try:
-        from piper import PiperVoice
-        from piper.config import SynthesisConfig
-    except ImportError:  # pragma: no cover - depends on runtime environment
-        PiperVoice = Any
-        SynthesisConfig = Any
+from typing import Any
 
 from hu_speaker.core.config import get_settings
+from hu_speaker.core.exceptions import UnknownModelError
+from hu_speaker.modules.speaker.engines import (
+    AVAILABLE_MODELS,
+    KokoroEngine,
+    PiperEngine,
+    TTSEngine,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class SpeakerService:
-    """Serviço de síntese de voz usando Piper TTS."""
+    """Serviço de síntese de voz com múltiplas engines de TTS."""
 
     # Mapa de dígitos para palavras em português
     DIGIT_MAP = {
@@ -54,17 +55,32 @@ class SpeakerService:
         self.model_path = model_path or (package_dir / "models" / settings.PIPER_MODEL)
         self.output_dir = output_dir or Path(settings.AUDIO_OUTPUT_DIR)
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self._voice = voice
+
+        self._default_model = settings.DEFAULT_TTS_MODEL.lower()
+        # Voz Piper injetada (usada nos testes). Encaminhada à PiperEngine.
+        self._injected_voice = voice
+        # Cache de engines já instanciadas (carregar modelo é caro).
+        self._engines: dict[str, TTSEngine] = {}
         self._syntheses: dict[str, dict[str, str]] = {}
 
-    def _get_voice(self) -> Any:
-        if self._voice is None:
-            if not self.model_path.exists():
-                raise FileNotFoundError(f"Piper model not found: {self.model_path}")
+    def _build_engine(self, model: str) -> TTSEngine:
+        settings = get_settings()
+        if model == PiperEngine.name:
+            return PiperEngine(self.model_path, voice=self._injected_voice)
+        if model == KokoroEngine.name:
+            return KokoroEngine(
+                lang_code=settings.KOKORO_LANG_CODE,
+                voice=settings.KOKORO_VOICE,
+            )
+        raise UnknownModelError(model, AVAILABLE_MODELS)
 
-            self._voice = PiperVoice.load(str(self.model_path))
-
-        return self._voice
+    def _get_engine(self, model: str) -> TTSEngine:
+        model = (model or self._default_model).lower()
+        if model not in AVAILABLE_MODELS:
+            raise UnknownModelError(model, AVAILABLE_MODELS)
+        if model not in self._engines:
+            self._engines[model] = self._build_engine(model)
+        return self._engines[model]
 
     @staticmethod
     def _spell_digits(digits: str) -> str:
@@ -73,9 +89,9 @@ class SpeakerService:
 
     @staticmethod
     def _preprocess_text(text: str) -> str:
-        """Pré-processa o texto para melhor pronúncia pelo Piper.
+        """Pré-processa o texto para melhor pronúncia pela engine.
 
-        O Piper tropeça em "tokens" que misturam letra e número colados
+        As engines tropeçam em "tokens" que misturam letra e número colados
         (ex.: uma senha "A001"), chegando a engolir a letra. Aqui esses
         casos são separados e os dígitos são soletrados um a um.
 
@@ -107,15 +123,48 @@ class SpeakerService:
 
         return result
 
+    def _synthesize_pcm(
+        self, model: str, processed_text: str, length_scale: float
+    ) -> tuple[bytes, int, str]:
+        """Sintetiza usando ``model``, com fallback para o Piper em caso de falha.
+
+        Returns:
+            ``(pcm_bytes, sample_rate, used_model)`` — ``used_model`` reflete a
+            engine que de fato produziu o áudio (pode diferir de ``model`` se o
+            fallback for acionado).
+        """
+        engine = self._get_engine(model)
+        try:
+            pcm, sample_rate = engine.synthesize_pcm(processed_text, length_scale)
+            return pcm, sample_rate, engine.name
+        except Exception as exc:  # noqa: BLE001 - fallback resiliente por design
+            if engine.name == PiperEngine.name:
+                # Piper é o motor base; se ele falhar não há para onde cair.
+                raise
+            logger.warning(
+                "TTS engine failed, falling back to Piper",
+                extra={"model": engine.name, "error": str(exc)},
+            )
+            fallback = self._get_engine(PiperEngine.name)
+            pcm, sample_rate = fallback.synthesize_pcm(processed_text, length_scale)
+            return pcm, sample_rate, fallback.name
+
     def synthesize(
-        self, text: str, language: str = "pt_BR", length_scale: float = 1.0
+        self,
+        text: str,
+        language: str = "pt_BR",
+        length_scale: float = 1.0,
+        model: str | None = None,
     ) -> dict[str, str]:
         """Sintetiza um texto em áudio.
-        
+
         Args:
             text: Texto a sintetizar
             language: Idioma (padrão: pt_BR)
-            length_scale: Velocidade do áudio (0.5-2.0, padrão 1.0)
+            length_scale: Velocidade do áudio (0.5-2.0, padrão 1.0). Maior =
+                mais devagar.
+            model: Modelo de voz ("piper", "kokoro"). Se ``None``, usa o
+                ``DEFAULT_TTS_MODEL`` das configurações.
         """
         text = text.strip()
         if not text:
@@ -127,47 +176,34 @@ class SpeakerService:
         synthesis_id = str(uuid.uuid4())
         audio_path = self.output_dir / f"{synthesis_id}.wav"
 
-        voice = self._get_voice()
-        syn_config = SynthesisConfig(length_scale=length_scale) if length_scale != 1.0 else None
-
-        # Sample rate do modelo (pt_BR faber = 22050 Hz).
-        try:
-            sample_rate = int(voice.config.sample_rate)
-        except AttributeError:
-            sample_rate = 22050
-
-        # piper-tts 1.6.0: voice.synthesize() devolve uma sequencia de AudioChunk.
-        # Concatena os bytes int16 de TODOS os chunks e grava um unico WAV com o
-        # cabecalho correto. (Escrever apenas o primeiro chunk cortava a fala e
-        # deixava o audio truncado/estranho.)
-        audio_bytes = bytearray()
-        for chunk in voice.synthesize(processed_text, syn_config=syn_config):
-            data = getattr(chunk, "audio_int16_bytes", None)
-            if data is None:
-                # fallbacks para variacoes de atributo entre versoes
-                data = getattr(chunk, "audio_int16", None)
-                if data is not None and not isinstance(data, (bytes, bytearray)):
-                    data = data.tobytes()
-            if data:
-                audio_bytes.extend(data)
+        requested_model = (model or self._default_model).lower()
+        audio_bytes, sample_rate, used_model = self._synthesize_pcm(
+            requested_model, processed_text, length_scale
+        )
 
         with wave.open(str(audio_path), "wb") as wav_file:
             wav_file.setnchannels(1)
             wav_file.setsampwidth(2)  # 16-bit PCM
             wav_file.setframerate(sample_rate)
-            wav_file.writeframes(bytes(audio_bytes))
+            wav_file.writeframes(audio_bytes)
 
         result = {
             "id": synthesis_id,
             "text": text,  # Retorna o texto original no resultado
             "language": language,
+            "model": used_model,
             "status": "completed",
         }
 
         self._syntheses[synthesis_id] = {**result, "audio_path": str(audio_path)}
         logger.info(
             "Audio synthesized",
-            extra={"synthesis_id": synthesis_id, "audio_path": str(audio_path)},
+            extra={
+                "synthesis_id": synthesis_id,
+                "audio_path": str(audio_path),
+                "requested_model": requested_model,
+                "used_model": used_model,
+            },
         )
         return result
 

@@ -18,7 +18,11 @@ dependencies = [
   "piper-tts",
   "pydantic-settings>=2.0.0",
   "python-dotenv>=1.0.0",
-  "PyJWT>=2.0.0"
+  "PyJWT>=2.0.0",
+  # Kokoro TTS (segundo motor, Apache-2.0). torch é instalado em modo CPU
+  # pelo Dockerfile (índice cpu) antes deste passo, para evitar o build CUDA.
+  "kokoro>=0.9.2",
+  "numpy>=1.26.0"
 ]
 
 [project.optional-dependencies]
@@ -58,6 +62,11 @@ mypy_path = "src"
 module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 follow_imports_for_stubs = true
+
+# kokoro (motor TTS opcional) não publica type stubs; é importado de forma
+# preguiçosa dentro da KokoroEngine.
+[[tool.mypy.overrides]]
+module = ["kokoro", "kokoro.*"]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]
