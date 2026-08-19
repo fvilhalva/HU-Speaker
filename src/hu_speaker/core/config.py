@@ -32,11 +32,19 @@ class Settings(BaseSettings):
     HIS_API_KEY: str = ""  # API key para integração com HIS
     HIS_API_TIMEOUT: int = 30
 
+    # TTS (síntese de voz)
+    # Modelo usado quando o cliente não informa "model" no JSON.
+    DEFAULT_TTS_MODEL: str = "piper"
+
     # Piper TTS
     PIPER_MODEL: str = "pt_BR-faber-medium.onnx"
     PIPER_SPEAKERS: str = "0"  # Índice do speaker
     AUDIO_OUTPUT_DIR: str = "/tmp/hu-speaker-audio"
     MAX_TEXT_LENGTH: int = 1000
+
+    # Kokoro TTS
+    KOKORO_LANG_CODE: str = "p"  # 'p' = português do Brasil
+    KOKORO_VOICE: str = "pf_dora"  # vozes pt-BR: pf_dora, pm_alex, pm_santa
 
     # Audio Cleanup (limpeza de arquivos antigos)
     CLEANUP_TTL_MINUTES: int = 10  # Tempo em minutos para manter arquivos WAV

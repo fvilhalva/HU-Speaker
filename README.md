@@ -128,16 +128,20 @@ Sintetiza um texto em áudio.
 **Cabeçalho:** `Authorization: Bearer <jwt>`
 **Corpo (JSON):**
 ```json
-{ "text": "João da Silva", "language": "pt_BR", "length_scale": 1.6 }
+{ "text": "João da Silva", "language": "pt_BR", "length_scale": 1.6, "model": "piper" }
 ```
 - `text` (obrigatório): 1–1000 caracteres.
 - `language` (opcional): padrão `"pt_BR"`.
 - `length_scale` (opcional): velocidade da fala, 0.5–2.0. Padrão `1.0` (maior = mais devagar).
+- `model` (opcional): motor de voz, `"piper"` ou `"kokoro"`. Ausente = `DEFAULT_TTS_MODEL`.
 
 **Resposta:**
 ```json
-{ "id": "798d5acd-...", "text": "João da Silva", "language": "pt_BR", "status": "completed" }
+{ "id": "798d5acd-...", "text": "João da Silva", "language": "pt_BR", "model": "piper", "status": "completed" }
 ```
+> `model` na resposta é o motor **efetivamente** usado. Se o motor pedido
+> falhar, o serviço cai automaticamente para o Piper (fallback) e o campo
+> reflete isso.
 
 ### `GET /speak/download/{id}`
 Devolve o arquivo de áudio WAV (PCM 16-bit, mono, 22050 Hz).
@@ -230,9 +234,26 @@ Definidas no `.env` do HU-Speaker (veja `.env.example`):
 |---|---|---|
 | `JWT_SECRET_KEY` | Segredo de assinatura dos tokens (igual ao do NovoSGA) | *(string forte)* |
 | `CORS_ORIGINS` | Origens permitidas a chamar a API (inclui o painel) | `http://localhost:9000` |
+| `DEFAULT_TTS_MODEL` | Motor usado quando o JSON não traz `model` | `piper` |
 | `PIPER_MODEL` | Modelo de voz Piper | `pt_BR-faber-medium.onnx` |
+| `KOKORO_LANG_CODE` | Idioma do Kokoro (`p` = pt-BR) | `p` |
+| `KOKORO_VOICE` | Voz do Kokoro | `pf_dora` |
 | `AUDIO_OUTPUT_DIR` | Diretório temporário dos áudios | `/tmp/hu-speaker-audio` |
 | `CLEANUP_TTL_MINUTES` | Minutos até apagar cada áudio | `10` |
+
+### Modelos de voz (engines)
+
+O HU-Speaker suporta múltiplos motores de TTS, selecionáveis por requisição
+via o campo `model`:
+
+| Modelo | Motor | Licença | Observação |
+|---|---|---|---|
+| `piper` | [Piper](https://github.com/rhasspy/piper) | MIT | Rápido e leve, é o motor **base** e o alvo do fallback. |
+| `kokoro` | [Kokoro](https://github.com/hexgrad/kokoro) | Apache-2.0 | Qualidade superior, roda em CPU; usa `torch` + `espeak-ng`. |
+
+Adicionar um novo motor é criar uma subclasse de `TTSEngine` em
+`modules/speaker/engines/` e registrá-la em `AVAILABLE_MODELS`. Todo o resto
+(pré-processamento, WAV, IDs, limpeza) é compartilhado.
 
 > **CORS:** como o painel (`:9000`) e a API (`:8082`) têm origens diferentes, a origem do painel
 > precisa estar em `CORS_ORIGINS`, senão o navegador bloqueia a chamada.
@@ -267,6 +288,7 @@ HU-Speaker/
 │   └── modules/
 │       ├── health/            # /health
 │       └── speaker/           # síntese, download, status, delete, limpeza
+│           └── engines/       # TTSEngine (base) + PiperEngine + KokoroEngine
 ├── docker-compose.yml         # serviço na rede sga-net, tmpfs para os áudios
 ├── Dockerfile
 └── .env.example
