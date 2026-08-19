@@ -14,6 +14,10 @@ class SynthesisRequest(BaseModel):
         le=2.0,
         description="Velocidade do áudio (0.5=rápido, 1.0=normal, 2.0=devagar)",
     )
+    model: str | None = Field(
+        default=None,
+        description="Modelo de voz: 'piper' ou 'kokoro'. Ausente = padrão do servidor.",
+    )
 
 
 class SynthesisResponse(BaseModel):
@@ -22,6 +26,7 @@ class SynthesisResponse(BaseModel):
     id: str = Field(..., description="ID único da requisição")
     text: str = Field(..., description="Texto sintetizado")
     language: str = Field(..., description="Idioma utilizado")
+    model: str = Field(..., description="Modelo de voz efetivamente utilizado")
     status: str = Field(..., description="Status da síntese")
 
 

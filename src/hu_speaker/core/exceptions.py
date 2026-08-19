@@ -22,3 +22,14 @@ class ServiceUnavailable(APIException):
     def __init__(self, detail: str = "Serviço indisponível") -> None:
         """Inicializa a exceção."""
         super().__init__(detail=detail, status_code=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class UnknownModelError(APIException):
+    """Modelo de voz solicitado não existe."""
+
+    def __init__(self, model: str, available: tuple[str, ...] | list[str]) -> None:
+        """Inicializa a exceção com a lista de modelos disponíveis."""
+        super().__init__(
+            detail=f"Unknown TTS model '{model}'. Available: {', '.join(available)}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )

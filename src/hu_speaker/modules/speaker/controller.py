@@ -20,7 +20,8 @@ class SpeakerController:
         result = self.service.synthesize(
             text=request.text,
             language=request.language,
-            length_scale=request.length_scale
+            length_scale=request.length_scale,
+            model=request.model,
         )
 
         return SynthesisResponse(**result)
